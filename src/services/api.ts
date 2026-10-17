@@ -1,0 +1,420 @@
+// Luce D'Oro - API Client Service
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: 'owner' | 'customer' | string;
+  isVerified?: boolean;
+  isOwner?: boolean;
+  createdAt?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image_url: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  category_id: string;
+  price: number;
+  old_price: number | null;
+  cost_price?: number;
+  is_archived?: number;
+  description: string;
+  materials: string;
+  care_instructions: string;
+  dimensions: string;
+  warranty: string;
+  stock: number;
+  is_featured: boolean | number;
+  image_primary: string;
+  images: string[];
+  variants: string[];
+  created_at?: string;
+}
+
+export interface CartItem {
+  id: number;
+  product_id: string;
+  variant_title: string;
+  quantity: number;
+  name: string;
+  price: number;
+  image_primary: string;
+  stock: number;
+}
+
+export interface CartResponse {
+  cartId: string;
+  items: CartItem[];
+  itemCount: number;
+  total: number;
+  freeShippingThreshold: number;
+  hasFreeShipping: boolean;
+}
+
+export interface OrderItem {
+  id: number;
+  product_id: string;
+  product_name: string;
+  variant_title: string;
+  unit_price: number;
+  quantity: number;
+  image_url: string;
+}
+
+export interface Order {
+  id: string;
+  user_id?: number;
+  total: number;
+  status: string;
+  shipping_address: string;
+  payment_method: string;
+  tracking_code?: string;
+  internal_notes?: string;
+  created_at: string;
+  customer_name?: string;
+  customer_email?: string;
+  items: OrderItem[];
+}
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  cta_text?: string;
+  cta_link?: string;
+  image_desktop: string;
+  image_mobile?: string;
+  is_active: number;
+  display_order: number;
+  created_at: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: 'percent' | 'fixed' | string;
+  discount_value: number;
+  min_spend: number;
+  is_active: number;
+  usage_count: number;
+  created_at: string;
+}
+
+export interface StockMovement {
+  id: number;
+  product_id: string;
+  product_name?: string;
+  quantity_change: number;
+  previous_stock: number;
+  new_stock: number;
+  reason: string;
+  user_name?: string;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: number;
+  user_id?: number;
+  user_email?: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  details?: any;
+  ip_address?: string;
+  created_at: string;
+}
+
+export interface AdminAlert {
+  id: string;
+  type: 'warning' | 'info' | 'danger';
+  title: string;
+  message: string;
+  link?: string;
+}
+
+export interface AdminDashboardData {
+  period: string;
+  ordersCount: number;
+  revenue: number;
+  averageTicket: number;
+  statusCounts: Record<string, number>;
+  lowStockCount: number;
+  outOfStockCount: number;
+  lowStockProducts: any[];
+  topProducts: any[];
+  recentOrders: any[];
+  activeCoupons: number;
+  totalCustomers: number;
+}
+
+// Token helper for cross-origin or local backup
+const TOKEN_KEY = 'cd_de_ouro_session_token';
+
+export const tokenStorage = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers || {});
+  headers.set('Content-Type', 'application/json');
+
+  const token = tokenStorage.get();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(endpoint, {
+    ...options,
+    headers,
+    credentials: 'include', // sends cookies
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Ocorreu um erro na requisição. Tente novamente.');
+  }
+
+  return data as T;
+}
+
+export const api = {
+  auth: {
+    validateEmail: (email: string) =>
+      request<{ valid: boolean }>('/api/auth/validate-email', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+
+    login: async (email: string, password: string) => {
+      const res = await request<{ token: string; user: User }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.token) {
+        tokenStorage.set(res.token);
+      }
+      return res;
+    },
+
+    register: async (payload: { name: string; email: string; password: string; confirmPassword: string }) => {
+      const res = await request<{ token: string; user: User }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (res.token) {
+        tokenStorage.set(res.token);
+      }
+      return res;
+    },
+
+    me: () => request<{ user: User }>('/api/auth/me'),
+
+    logout: async () => {
+      try {
+        await request<{ success: boolean }>('/api/auth/logout', { method: 'POST' });
+      } finally {
+        tokenStorage.clear();
+      }
+    },
+
+    forgotPassword: (email: string) =>
+      request<{ success: boolean; message: string }>('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+  },
+
+  catalog: {
+    getCategories: () => request<Category[]>('/api/catalog/categories'),
+
+    getProducts: (params?: { category?: string; sort?: string; search?: string; featured?: boolean }) => {
+      const query = new URLSearchParams();
+      if (params?.category) query.append('category', params.category);
+      if (params?.sort) query.append('sort', params.sort);
+      if (params?.search) query.append('search', params.search);
+      if (params?.featured) query.append('featured', 'true');
+      return request<Product[]>(`/api/catalog/products?${query.toString()}`);
+    },
+
+    getProductBySlug: (slug: string) => request<Product>(`/api/catalog/products/${slug}`),
+  },
+
+  cart: {
+    getCart: () => request<CartResponse>('/api/cart'),
+
+    addItem: (productId: string, variantTitle: string, quantity = 1) =>
+      request<{ success: boolean; message: string }>('/api/cart/items', {
+        method: 'POST',
+        body: JSON.stringify({ productId, variantTitle, quantity }),
+      }),
+
+    updateItem: (itemId: number, quantity: number) =>
+      request<{ success: boolean }>(`/api/cart/items/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ quantity }),
+      }),
+
+    removeItem: (itemId: number) =>
+      request<{ success: boolean; message: string }>(`/api/cart/items/${itemId}`, {
+        method: 'DELETE',
+      }),
+  },
+
+  orders: {
+    list: () => request<Order[]>('/api/orders'),
+
+    create: (payload: { shippingAddress: string; paymentMethod: string; couponCode?: string }) =>
+      request<{ success: boolean; orderId: string; total: number; message: string }>('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  },
+
+  banners: {
+    list: () => request<Banner[]>('/api/banners'),
+  },
+
+  settings: {
+    get: () => request<Record<string, string>>('/api/settings'),
+  },
+
+  coupons: {
+    validate: (code: string, cartTotal: number) =>
+      request<{
+        valid: boolean;
+        code: string;
+        discountType: string;
+        discountValue: number;
+        discountAmount: number;
+      }>('/api/coupons/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code, cartTotal }),
+      }),
+  },
+
+  // EXCLUSIVE OWNER ADMIN ENDPOINTS
+  admin: {
+    getSetupStatus: () =>
+      request<{
+        authorizedOwnerEmail: string;
+        authorizedOwnerName: string;
+        isRegistered: boolean;
+        isInitialized: boolean;
+        requiresVerification: boolean;
+      }>('/api/admin/setup/status'),
+
+    verifyOwner: (setupKey: string) =>
+      request<{ success: boolean; message: string; role: string }>('/api/admin/setup/verify-owner', {
+        method: 'POST',
+        body: JSON.stringify({ setupKey }),
+      }),
+
+    getDashboard: (period = 'all') =>
+      request<AdminDashboardData>(`/api/admin/dashboard?period=${period}`),
+
+    getProducts: () => request<Product[]>('/api/admin/products'),
+
+    createProduct: (data: Partial<Product>) =>
+      request<{ success: boolean; id: string; message: string }>('/api/admin/products', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateProduct: (id: string, data: Partial<Product>) =>
+      request<{ success: boolean; message: string }>(`/api/admin/products/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteProduct: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/products/${id}`, {
+        method: 'DELETE',
+      }),
+
+    getOrders: (params?: { status?: string; q?: string }) => {
+      const query = new URLSearchParams();
+      if (params?.status) query.append('status', params.status);
+      if (params?.q) query.append('q', params.q);
+      return request<Order[]>(`/api/admin/orders?${query.toString()}`);
+    },
+
+    updateOrderStatus: (id: string, payload: { status: string; trackingCode?: string; internalNotes?: string }) =>
+      request<{ success: boolean; message: string }>(`/api/admin/orders/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+
+    getStock: () => request<{ products: Product[]; movements: StockMovement[] }>('/api/admin/stock'),
+
+    adjustStock: (productId: string, quantityChange: number, reason: string) =>
+      request<{ success: boolean; message: string; newStock: number }>('/api/admin/stock/adjust', {
+        method: 'POST',
+        body: JSON.stringify({ productId, quantityChange, reason }),
+      }),
+
+    getBanners: () => request<Banner[]>('/api/admin/banners'),
+
+    createBanner: (data: Partial<Banner>) =>
+      request<{ success: boolean; id: string; message: string }>('/api/admin/banners', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateBanner: (id: string, data: Partial<Banner>) =>
+      request<{ success: boolean; message: string }>(`/api/admin/banners/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteBanner: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/banners/${id}`, {
+        method: 'DELETE',
+      }),
+
+    getSettings: () => request<Record<string, string>>('/api/admin/settings'),
+
+    updateSettings: (data: Record<string, string>) =>
+      request<{ success: boolean; message: string }>('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    getCoupons: () => request<Coupon[]>('/api/admin/coupons'),
+
+    createCoupon: (data: Partial<Coupon>) =>
+      request<{ success: boolean; id: string; message: string }>('/api/admin/coupons', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateCoupon: (id: string, data: Partial<Coupon>) =>
+      request<{ success: boolean; message: string }>(`/api/admin/coupons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteCoupon: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/coupons/${id}`, {
+        method: 'DELETE',
+      }),
+
+    getCustomers: () => request<any[]>('/api/admin/customers'),
+
+    getAuditLogs: () => request<AuditLog[]>('/api/admin/audit-logs'),
+
+    getAlerts: () => request<AdminAlert[]>('/api/admin/alerts'),
+  },
+};
