@@ -23,39 +23,42 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
     <div className={styles.homeContainer}>
       {/* SEÇÃO 1: HERO PRINCIPAL EDITORIAL */}
       <section className={styles.heroSection}>
-        <div className={styles.heroBackground}>
-          <img
-            src="/images/hero-editorial.jpg"
-            alt="Composição de joias finas em ouro 18k Luce D'Oro sobre seda marfim"
-            className={styles.heroImage}
-          />
-          <div className={styles.heroGradient} />
-        </div>
-
         <div className="container">
-          <div className={styles.heroContent}>
-            <div className={styles.heroPill}>
-              <Sparkles size={13} color="#B89758" />
-              <span>ALTA JOALHERIA CONTEMPORÂNEA</span>
+          <div className={styles.heroGrid}>
+            <div className={styles.heroContent}>
+              <div className={styles.heroPill}>
+                <Sparkles size={13} color="#B89758" />
+                <span>ALTA JOALHERIA CONTEMPORÂNEA</span>
+              </div>
+
+              <h1 className={styles.heroTitle}>
+                Detalhes que contam a sua história.
+              </h1>
+
+              <p className={styles.heroSubtitle}>
+                Joias forjadas em ouro nobre 18k com acabamento primoroso. O encontro harmonioso entre o luxo discreto e a autenticidade contemporânea.
+              </p>
+
+              <div className={styles.heroCtaRow}>
+                <button
+                  onClick={() => onNavigateCategory('pulseiras')}
+                  className={`btn-primary ${styles.heroCta}`}
+                  id="hero-cta-btn"
+                >
+                  <span>Descubra a coleção</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
             </div>
 
-            <h1 className={styles.heroTitle}>
-              Detalhes que contam a sua história.
-            </h1>
-
-            <p className={styles.heroSubtitle}>
-              Joias forjadas em ouro nobre 18k com acabamento primoroso. O encontro harmonioso entre o luxo discreto e a autenticidade contemporânea.
-            </p>
-
-            <div className={styles.heroCtaRow}>
-              <button
-                onClick={() => onNavigateCategory('pulseiras')}
-                className={`btn-primary ${styles.heroCta}`}
-                id="hero-cta-btn"
-              >
-                <span>Descubra a coleção</span>
-                <ArrowRight size={16} />
-              </button>
+            <div className={styles.heroVisualCol}>
+              <div className={styles.heroImageWrapper}>
+                <img
+                  src="/images/hero-luce-d-oro.png"
+                  alt="Luce D'Oro Joalheria Contemporânea"
+                  className={styles.heroBrandImage}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -246,7 +249,7 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
               A Luce D'Oro une a herança da ourivesaria clássica ao minimalismo da joalheria contemporânea, criando símbolos de afeto, conquista e identidade pessoal.
             </p>
             <div className={styles.signature}>
-              <span className={styles.signatureMonogram}>CD</span>
+              <img src="/images/logo-header.png" alt="Luce D'Oro" className={styles.signatureLogo} />
               <span className={styles.signatureText}>Joalheria Contemporânea</span>
             </div>
           </div>

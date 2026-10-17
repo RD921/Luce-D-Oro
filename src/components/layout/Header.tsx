@@ -96,14 +96,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
               className={styles.brandButton}
               aria-label="Luce D'Oro - Página Inicial"
             >
-              <div className={styles.monogram}>
-                <span className={styles.letterC}>C</span>
-                <span className={styles.letterD}>D</span>
-              </div>
-              <div className={styles.brandTextWrapper}>
-                <span className={styles.brandTitle}>LUCE D'ORO</span>
-                <span className={styles.brandSubtitle}>JOALHERIA CONTEMPORÂNEA</span>
-              </div>
+              <img
+                src="/images/logo-header.png"
+                alt="Luce D'Oro"
+                className={styles.brandLogoImg}
+              />
             </button>
           </div>
 

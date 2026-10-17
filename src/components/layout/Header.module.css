@@ -91,10 +91,26 @@
 
 .brandButton {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 0.4rem 1rem;
+  justify-content: center;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.brandButton:hover {
+  opacity: 0.88;
+  transform: scale(1.02);
+}
+
+.brandLogoImg {
+  height: 58px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  display: block;
 }
 
 .monogram {
