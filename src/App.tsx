@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SiteProvider, useSite } from './context/SiteContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
@@ -22,12 +23,18 @@ function AppContent() {
 
   const { setCheckoutModalOpen } = useCart();
   const { isOwner, setOrdersModalOpen } = useAuth();
+  const { categories, categoriesLoaded } = useSite();
+  const primeiraCategoria = categories[0]?.slug || 'pulseiras';
 
-  // Sync hash routing: e.g. #pulseiras, #correntes, #brincos, #home
+  // Sync hash routing: e.g. #pulseiras, #novacategoria, #home (as categorias vêm do servidor)
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      if (['pulseiras', 'correntes', 'brincos'].includes(hash)) {
+      if (hash && categories.some((c) => c.slug === hash)) {
+        setCurrentView('category');
+        setCurrentCategory(hash);
+      } else if (hash && !categoriesLoaded) {
+        // Ainda carregando a lista: mantém o endereço e decide quando ela chegar
         setCurrentView('category');
         setCurrentCategory(hash);
       } else {
@@ -38,7 +45,7 @@ function AppContent() {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [categories, categoriesLoaded]);
 
   const handleNavigate = (view: string, param?: string) => {
     if (view === 'category' && param) {
@@ -85,7 +92,7 @@ function AppContent() {
       {/* Shopping Bag Drawer (Rendered ONLY if authenticated) */}
       <CartDrawer
         onOpenCheckout={() => setCheckoutModalOpen(true)}
-        onNavigateCatalog={() => handleNavigate('category', 'pulseiras')}
+        onNavigateCatalog={() => handleNavigate('category', primeiraCategoria)}
       />
 
       {/* Checkout Modal */}
@@ -112,9 +119,11 @@ export function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <CartProvider>
-          <AppContent />
-        </CartProvider>
+        <SiteProvider>
+          <CartProvider>
+            <AppContent />
+          </CartProvider>
+        </SiteProvider>
       </AuthProvider>
     </ToastProvider>
   );

@@ -16,6 +16,9 @@ export interface Category {
   slug: string;
   description: string;
   image_url: string;
+  display_order?: number;
+  is_active?: number;
+  product_count?: number;
 }
 
 export interface Product {
@@ -291,6 +294,10 @@ export const api = {
     get: () => request<Record<string, string>>('/api/settings'),
   },
 
+  content: {
+    get: () => request<Record<string, string>>('/api/content'),
+  },
+
   coupons: {
     validate: (code: string, cartTotal: number) =>
       request<{
@@ -412,6 +419,51 @@ export const api = {
       }),
 
     getCustomers: () => request<any[]>('/api/admin/customers'),
+
+    // ---- Conteúdo da loja (textos e imagens) ----
+    getContent: () =>
+      request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
+
+    updateContent: (values: Record<string, string>) =>
+      request<{ success: boolean; message: string }>('/api/admin/content', {
+        method: 'PUT',
+        body: JSON.stringify({ values }),
+      }),
+
+    // ---- Categorias ----
+    getCategories: () => request<Category[]>('/api/admin/categories'),
+
+    createCategory: (data: Partial<Category>) =>
+      request<{ success: boolean; id: string; message: string }>('/api/admin/categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateCategory: (id: string, data: Partial<Category>) =>
+      request<{ success: boolean; message: string }>(`/api/admin/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteCategory: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/categories/${id}`, {
+        method: 'DELETE',
+      }),
+
+    // ---- Upload de imagem (arquivo do computador) ----
+    uploadImage: async (file: File) => {
+      if (file.size > 6 * 1024 * 1024) throw new Error('A imagem tem mais de 6 MB. Reduza o tamanho e tente de novo.');
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+        reader.readAsDataURL(file);
+      });
+      return request<{ url: string; bytes: number }>('/api/admin/uploads', {
+        method: 'POST',
+        body: JSON.stringify({ data }),
+      });
+    },
 
     getAuditLogs: () => request<AuditLog[]>('/api/admin/audit-logs'),
 

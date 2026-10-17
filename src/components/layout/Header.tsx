@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, ShoppingBag, Menu, X, LogOut, Package, ChevronRight, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useSite } from '../../context/SiteContext';
 import styles from './Header.module.css';
 
 interface HeaderProps {
@@ -13,6 +14,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenAdmin }) => {
   const { user, isAuthenticated, isOwner, openAuthModal, logout, setOrdersModalOpen } = useAuth();
   const { cart, openCartDrawer } = useCart();
+  const { categories } = useSite();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -69,24 +71,15 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
 
           {/* Left Region — Commercial Navigation */}
           <nav className={styles.navLeft} aria-label="Navegação de Categorias">
-            <button
-              onClick={() => handleCategoryClick('pulseiras')}
-              className={`${styles.navLink} ${currentView === 'category' && window.location.hash.includes('pulseiras') ? styles.activeLink : ''}`}
-            >
-              Pulseiras
-            </button>
-            <button
-              onClick={() => handleCategoryClick('correntes')}
-              className={`${styles.navLink} ${currentView === 'category' && window.location.hash.includes('correntes') ? styles.activeLink : ''}`}
-            >
-              Correntes
-            </button>
-            <button
-              onClick={() => handleCategoryClick('brincos')}
-              className={`${styles.navLink} ${currentView === 'category' && window.location.hash.includes('brincos') ? styles.activeLink : ''}`}
-            >
-              Brincos
-            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handleCategoryClick(cat.slug)}
+                className={`${styles.navLink} ${currentView === 'category' && window.location.hash.replace('#', '').toLowerCase() === cat.slug ? styles.activeLink : ''}`}
+              >
+                {cat.name}
+              </button>
+            ))}
           </nav>
 
           {/* Center Region — Brand Identity (Strictly Centered Horizontally) */}
@@ -211,18 +204,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
               </button>
             </div>
             <nav className={styles.mobileNavLinks}>
-              <button onClick={() => handleCategoryClick('pulseiras')} className={styles.mobileNavLink}>
-                <span>Pulseiras</span>
-                <ChevronRight size={16} />
-              </button>
-              <button onClick={() => handleCategoryClick('correntes')} className={styles.mobileNavLink}>
-                <span>Correntes</span>
-                <ChevronRight size={16} />
-              </button>
-              <button onClick={() => handleCategoryClick('brincos')} className={styles.mobileNavLink}>
-                <span>Brincos</span>
-                <ChevronRight size={16} />
-              </button>
+              {categories.map((cat) => (
+                <button key={cat.id} onClick={() => handleCategoryClick(cat.slug)} className={styles.mobileNavLink}>
+                  <span>{cat.name}</span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
               <button
                 onClick={() => {
                   onNavigate('home');

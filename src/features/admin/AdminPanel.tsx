@@ -3,10 +3,11 @@ import {
   LayoutDashboard, Package, ShoppingCart, Archive, Image, Tag, Settings,
   Shield, X, Plus, Edit2, Trash2, Search,
   AlertTriangle, Users, ArrowUpCircle, ArrowDownCircle,
-  CheckCircle, XCircle, Truck, Eye, LogOut
+  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { api, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData } from '../../services/api';
+import { useSite } from '../../context/SiteContext';
+import { api, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData } from '../../services/api';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -67,16 +68,60 @@ const statusClass = (s: string) => {
 
 const ORDER_STATUSES = ['Confirmado', 'Em preparação', 'Enviado', 'Entregue', 'Cancelado'];
 
+// Botão "Enviar do computador": manda a foto para o servidor e devolve o endereço dela
+function UploadButton({ onUploaded, label = 'Enviar do computador' }: { onUploaded: (url: string) => void; label?: string }) {
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState('');
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setSending(true);
+    setErr('');
+    try {
+      const r = await api.admin.uploadImage(file);
+      onUploaded(r.url);
+    } catch (ex: any) {
+      setErr(ex.message || 'Não foi possível enviar a imagem.');
+    }
+    setSending(false);
+  };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <label className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ cursor: sending ? 'wait' : 'pointer' }}>
+        <Upload size={13} /> {sending ? 'Enviando…' : label}
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style={{ display: 'none' }} onChange={pick} disabled={sending} />
+      </label>
+      {err && <span style={{ color: '#e57373', fontSize: '0.75rem' }}>{err}</span>}
+    </span>
+  );
+}
+
+// Campo de imagem: cole um link OU envie um arquivo do computador
+function ImageField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input className={styles.formInput} style={{ flex: 1, minWidth: 180 }} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Cole um link ou envie um arquivo'} />
+        <UploadButton onUploaded={onChange} />
+      </div>
+      {value && <img src={value} alt="" className={styles.bannerPreview} onError={() => {}} />}
+    </>
+  );
+}
+
 // ============================================================
 // TABS
 // ============================================================
-type TabId = 'dashboard' | 'products' | 'orders' | 'stock' | 'banners' | 'coupons' | 'settings' | 'audit';
+type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'settings' | 'audit';
 
 interface Tab { id: TabId; label: string; icon: React.ReactNode }
 
 const TABS: Tab[] = [
   { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={15} /> },
   { id: 'products',   label: 'Produtos',     icon: <Package size={15} /> },
+  { id: 'categories', label: 'Categorias',   icon: <Layers size={15} /> },
+  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} /> },
   { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} /> },
   { id: 'stock',      label: 'Estoque',      icon: <Archive size={15} /> },
   { id: 'banners',    label: 'Banners',      icon: <Image size={15} /> },
@@ -185,6 +230,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         <div className={styles.scrollArea}>
           {activeTab === 'dashboard'  && <DashboardTab />}
           {activeTab === 'products'   && <ProductsTab />}
+          {activeTab === 'categories' && <CategoriesTab />}
+          {activeTab === 'content'    && <ContentTab />}
           {activeTab === 'orders'     && <OrdersTab />}
           {activeTab === 'stock'      && <StockTab />}
           {activeTab === 'banners'    && <BannersTab />}
@@ -515,11 +562,12 @@ function ProductsTab() {
 
 // Product form modal
 function ProductModal({ product, onClose, onSaved }: { product?: Product; onClose: () => void; onSaved: () => void }) {
+  const { categories } = useSite();
   const isNew = !product;
   const [form, setForm] = useState({
     name: product?.name || '',
     slug: product?.slug || '',
-    category_id: product?.category_id || 'pulseiras',
+    category_id: product?.category_id || categories[0]?.id || 'pulseiras',
     price: product?.price ?? 0,
     old_price: product?.old_price ?? '',
     cost_price: product?.cost_price ?? '',
@@ -598,9 +646,8 @@ function ProductModal({ product, onClose, onSaved }: { product?: Product; onClos
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Categoria *</label>
               <select className={styles.formInput} value={form.category_id} onChange={e => set('category_id', e.target.value)}>
-                <option value="pulseiras">Pulseiras</option>
-                <option value="correntes">Correntes</option>
-                <option value="brincos">Brincos</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {!categories.some(c => c.id === form.category_id) && form.category_id && <option value={form.category_id}>{form.category_id} (desativada)</option>}
               </select>
             </div>
             <div className={styles.formGroup}>
@@ -624,15 +671,15 @@ function ProductModal({ product, onClose, onSaved }: { product?: Product; onClos
               <input className={styles.formInput} value={form.warranty} onChange={e => set('warranty', e.target.value)} />
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
-              <label className={styles.formLabel}>Imagem Principal (URL) *</label>
-              <input className={styles.formInput} value={form.image_primary} onChange={e => set('image_primary', e.target.value)} placeholder="https://…" />
-              {form.image_primary && (
-                <img src={form.image_primary} alt="" className={styles.bannerPreview} onError={() => {}} />
-              )}
+              <label className={styles.formLabel}>Imagem Principal *</label>
+              <ImageField value={form.image_primary} onChange={v => set('image_primary', v)} />
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
               <label className={styles.formLabel}>Imagens adicionais (uma por linha)</label>
               <textarea className={styles.formInput} rows={3} value={form.images} onChange={e => set('images', e.target.value)} />
+              <div style={{ marginTop: 6 }}>
+                <UploadButton label="Adicionar foto do computador" onUploaded={url => set('images', form.images ? form.images.replace(/\s+$/, '') + '\n' + url : url)} />
+              </div>
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
               <label className={styles.formLabel}>Variantes disponíveis (uma por linha)</label>
@@ -1007,6 +1054,246 @@ function StockTab() {
 }
 
 // ============================================================
+// TAB: CONTEÚDO (textos e imagens da loja)
+// ============================================================
+type CampoConteudo = Awaited<ReturnType<typeof api.admin.getContent>>[number];
+
+function ContentTab() {
+  const { refreshContent } = useSite();
+  const [campos, setCampos] = useState<CampoConteudo[]>([]);
+  const [valores, setValores] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const lista = await api.admin.getContent();
+      setCampos(lista);
+      setValores(Object.fromEntries(lista.map(c => [c.key, c.value])));
+    } catch (e: any) { setMsg(e.message); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const alterados = campos.filter(c => (valores[c.key] ?? '') !== c.value);
+
+  const salvar = async () => {
+    setSaving(true);
+    setMsg('');
+    try {
+      const mudou: Record<string, string> = {};
+      alterados.forEach(c => { mudou[c.key] = valores[c.key] ?? ''; });
+      await api.admin.updateContent(mudou);
+      await load();
+      await refreshContent();
+      setMsg('Conteúdo salvo. A loja já está com os novos textos.');
+    } catch (e: any) { setMsg(e.message); }
+    setSaving(false);
+  };
+
+  const grupos = Array.from(new Set(campos.map(c => c.group)));
+
+  if (loading) return <div className={styles.loader}><div className={styles.spinner}/></div>;
+
+  return (
+    <>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Textos e imagens da loja</span>
+        <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={salvar} disabled={saving || alterados.length === 0}>
+          {saving ? 'Salvando…' : alterados.length ? `Salvar ${alterados.length} alteração(ões)` : 'Nada para salvar'}
+        </button>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-muted)', margin: '0 0 1rem' }}>
+        A faixa principal da página inicial é editada em <strong>Banners</strong>. Contato, CNPJ e Instagram do rodapé vêm de <strong>Configurações</strong>.
+        Apague um campo (ou clique em "Restaurar") para voltar ao texto original.
+      </p>
+      {msg && <div className={styles.alertRow} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{msg}</div></div>}
+
+      {grupos.map(grupo => (
+        <div key={grupo} className={styles.tableWrapper} style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <div style={{ fontWeight: 600, marginBottom: '0.75rem' }}>{grupo}</div>
+          <div className={styles.formGrid}>
+            {campos.filter(c => c.group === grupo).map(c => (
+              <div key={c.key} className={`${styles.formGroup} ${c.type === 'text' ? '' : styles.formGridFull}`}>
+                <label className={styles.formLabel}>
+                  {c.label}
+                  {(valores[c.key] ?? '') !== c.def && (
+                    <button type="button" className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ marginLeft: 8, padding: '0 6px' }} onClick={() => setValores(v => ({ ...v, [c.key]: c.def }))}>
+                      Restaurar
+                    </button>
+                  )}
+                </label>
+                {c.type === 'image' ? (
+                  <ImageField value={valores[c.key] ?? ''} onChange={v => setValores(x => ({ ...x, [c.key]: v }))} />
+                ) : c.type === 'textarea' ? (
+                  <textarea className={styles.formInput} rows={3} value={valores[c.key] ?? ''} onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))} />
+                ) : (
+                  <input className={styles.formInput} value={valores[c.key] ?? ''} onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ============================================================
+// TAB: CATEGORIAS
+// ============================================================
+function CategoriesTab() {
+  const { refreshCategories } = useSite();
+  const [items, setItems] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try { setItems(await api.admin.getCategories()); } catch (e: any) { alert(e.message); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const afterChange = () => { load(); void refreshCategories(); };
+
+  const handleDelete = async (c: Category) => {
+    if (!confirm(`Excluir a categoria "${c.name}"?`)) return;
+    try { await api.admin.deleteCategory(c.id); afterChange(); } catch (e: any) { alert(e.message); }
+  };
+
+  const toggleActive = async (c: Category) => {
+    try { await api.admin.updateCategory(c.id, { is_active: c.is_active ? 0 : 1 }); afterChange(); } catch (e: any) { alert(e.message); }
+  };
+
+  return (
+    <>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Categorias da Loja</span>
+        <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={() => setCreating(true)}>
+          <Plus size={13} /> Nova Categoria
+        </button>
+      </div>
+
+      <div className={styles.tableWrapper}>
+        {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
+          <table>
+            <thead><tr><th>Imagem</th><th>Nome</th><th>Endereço</th><th>Produtos</th><th>Ordem</th><th>Na loja</th><th>Ações</th></tr></thead>
+            <tbody>
+              {items.length === 0 && <tr><td colSpan={7} className={styles.emptyState}>Nenhuma categoria criada.</td></tr>}
+              {items.map(c => (
+                <tr key={c.id}>
+                  <td>{c.image_url && <img src={c.image_url} alt={c.name} className={styles.productImg} style={{ width: 60, height: 36 }} onError={() => {}} />}</td>
+                  <td className={styles.productName}>{c.name}</td>
+                  <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>#{c.slug}</td>
+                  <td>{c.product_count ?? 0}</td>
+                  <td>{c.display_order ?? 0}</td>
+                  <td>
+                    <button className={`${styles.statusPill} ${c.is_active ? styles.statusConfirmed : styles.statusCancelled}`} style={{ cursor: 'pointer', border: 'none' }} onClick={() => toggleActive(c)} title="Clique para mostrar/esconder na loja">
+                      {c.is_active ? 'Visível' : 'Oculta'}
+                    </button>
+                  </td>
+                  <td>
+                    <div className={styles.actionBtns}>
+                      <button className={styles.btnIcon} onClick={() => setEditing(c)} title="Editar"><Edit2 size={13} /></button>
+                      <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => handleDelete(c)} title="Excluir"><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {(editing || creating) && (
+        <CategoryModal
+          category={editing || undefined}
+          onClose={() => { setEditing(null); setCreating(false); }}
+          onSaved={() => { setEditing(null); setCreating(false); afterChange(); }}
+        />
+      )}
+    </>
+  );
+}
+
+function CategoryModal({ category, onClose, onSaved }: { category?: Category; onClose: () => void; onSaved: () => void }) {
+  const isNew = !category;
+  const [form, setForm] = useState({
+    name: category?.name || '',
+    description: category?.description || '',
+    image_url: category?.image_url || '',
+    display_order: category?.display_order ?? 0,
+    is_active: category ? Boolean(category.is_active) : true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { setError('O nome da categoria é obrigatório.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const payload = { ...form, is_active: form.is_active ? 1 : 0 };
+      if (isNew) await api.admin.createCategory(payload);
+      else await api.admin.updateCategory(category!.id, payload);
+      onSaved();
+    } catch (e: any) { setError(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>{isNew ? 'Nova Categoria' : 'Editar Categoria'}</span>
+          <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className={styles.modalBody}>
+          {error && <div className={`${styles.alertRow} ${styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{error}</div></div>}
+          <div className={styles.formGrid}>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Nome *</label>
+              <input className={styles.formInput} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Anéis" />
+              {!isNew && <span style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>O endereço (#{category!.slug}) não muda ao renomear, para não quebrar links.</span>}
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Descrição (aparece no topo da página da categoria)</label>
+              <textarea className={styles.formInput} rows={3} value={form.description} onChange={e => set('description', e.target.value)} />
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Imagem da categoria</label>
+              <ImageField value={form.image_url} onChange={v => set('image_url', v)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Ordem no menu (menor aparece primeiro)</label>
+              <input type="number" className={styles.formInput} value={form.display_order} onChange={e => set('display_order', Number(e.target.value))} />
+            </div>
+            <div className={styles.formGroup} style={{ justifyContent: 'flex-end' }}>
+              <label className={styles.switchLabel}>
+                <input type="checkbox" className={styles.switchInput} checked={form.is_active} onChange={e => set('is_active', e.target.checked)} />
+                Visível na loja
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className={styles.modalFooter}>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={handleSave} disabled={saving}>
+            {saving ? 'Salvando…' : 'Salvar Categoria'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // TAB: BANNERS
 // ============================================================
 function BannersTab() {
@@ -1151,13 +1438,12 @@ function BannerModal({ banner, onClose, onSaved }: { banner?: Banner; onClose: (
               <input className={styles.formInput} value={form.cta_link} onChange={e => set('cta_link', e.target.value)} placeholder="#pulseiras" />
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
-              <label className={styles.formLabel}>Imagem Desktop (URL) *</label>
-              <input className={styles.formInput} value={form.image_desktop} onChange={e => set('image_desktop', e.target.value)} />
-              {form.image_desktop && <img src={form.image_desktop} alt="" className={styles.bannerPreview} onError={() => {}} />}
+              <label className={styles.formLabel}>Imagem Desktop *</label>
+              <ImageField value={form.image_desktop} onChange={v => set('image_desktop', v)} />
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
-              <label className={styles.formLabel}>Imagem Mobile (URL)</label>
-              <input className={styles.formInput} value={form.image_mobile} onChange={e => set('image_mobile', e.target.value)} />
+              <label className={styles.formLabel}>Imagem Mobile</label>
+              <ImageField value={form.image_mobile} onChange={v => set('image_mobile', v)} />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Ordem de Exibição</label>
@@ -1336,13 +1622,21 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 // TAB: SETTINGS
 // ============================================================
 function SettingsTab() {
+  const { refreshContent } = useSite();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    api.admin.getSettings().then(s => { setSettings(s); setLoading(false); }).catch(() => setLoading(false));
+    api.admin.getSettings().then(s => {
+      // Lojas antigas guardam estes dados com outros nomes: mostra o valor existente nos campos novos
+      const alias: Record<string, string> = { store_email: 'contact_email', store_phone: 'contact_whatsapp', store_slogan: 'store_tagline', store_instagram: 'instagram' };
+      const completo = { ...s };
+      for (const [novo, antigo] of Object.entries(alias)) if (!completo[novo] && s[antigo]) completo[novo] = s[antigo];
+      setSettings(completo);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   const set = (k: string, v: string) => setSettings(s => ({ ...s, [k]: v }));
@@ -1351,6 +1645,7 @@ function SettingsTab() {
     setSaving(true);
     try {
       await api.admin.updateSettings(settings);
+      void refreshContent();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) { alert(e.message); }

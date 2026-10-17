@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowRight, ShieldCheck, Award, Lock, Sparkles, Check } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useSite } from '../../context/SiteContext';
 import styles from './Footer.module.css';
 
 interface FooterProps {
@@ -11,6 +12,7 @@ export const Footer = ({ onNavigate }: FooterProps) => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const { showToast } = useToast();
+  const { categories, c, contato } = useSite();
 
   const handleNewsletter = (e: FormEvent) => {
     e.preventDefault();
@@ -30,11 +32,11 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             <div className={styles.newsletterText}>
               <div className={styles.goldPill}>
                 <Sparkles size={12} color="#B89758" />
-                <span>CÍRCULO EXCLUSIVO</span>
+                <span>{c('footer_news_tag')}</span>
               </div>
-              <h3 className={styles.newsletterTitle}>Receba lançamentos e convites privados</h3>
+              <h3 className={styles.newsletterTitle}>{c('footer_news_title')}</h3>
               <p className={styles.newsletterDesc}>
-                Cadastre seu e-mail para ter acesso antecipado a novas edições limitadas e conteúdos editoriais da joalheria.
+                {c('footer_news_desc')}
               </p>
             </div>
 
@@ -74,7 +76,7 @@ export const Footer = ({ onNavigate }: FooterProps) => {
                 <span className={styles.brandName}>LUCE D'ORO</span>
               </div>
               <p className={styles.brandBio}>
-                Joalheria contemporânea com peças exclusivas em ouro nobre, design autoral e acabamento primoroso. Detalhes que contam a sua história com discrição e sofisticação atemporal.
+                {c('footer_bio')}
               </p>
               <div className={styles.certBadge}>
                 <Award size={15} color="#B89758" />
@@ -86,21 +88,13 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             <div className={styles.linkCol}>
               <h4 className={styles.colTitle}>Coleções</h4>
               <ul className={styles.linkList}>
-                <li>
-                  <button onClick={() => onNavigate('category', 'pulseiras')} className={styles.footerLink}>
-                    Pulseiras
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => onNavigate('category', 'correntes')} className={styles.footerLink}>
-                    Correntes
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => onNavigate('category', 'brincos')} className={styles.footerLink}>
-                    Brincos
-                  </button>
-                </li>
+                {categories.map((cat) => (
+                  <li key={cat.id}>
+                    <button onClick={() => onNavigate('category', cat.slug)} className={styles.footerLink}>
+                      {cat.name}
+                    </button>
+                  </li>
+                ))}
                 <li>
                   <button onClick={() => onNavigate('home')} className={styles.footerLink}>
                     Destaques Editoriais
@@ -113,10 +107,12 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             <div className={styles.linkCol}>
               <h4 className={styles.colTitle}>Atendimento</h4>
               <ul className={styles.linkList}>
-                <li><span className={styles.footerStatic}>Concierge: contato@cddeouro.com.br</span></li>
-                <li><span className={styles.footerStatic}>WhatsApp: (11) 98765-4321</span></li>
-                <li><span className={styles.footerStatic}>Segunda a Sexta, das 09h às 19h</span></li>
-                <li><span className={styles.footerStatic}>Entregas & Trocas Cortesia</span></li>
+                <li><span className={styles.footerStatic}>Concierge: {contato.email}</span></li>
+                <li><span className={styles.footerStatic}>WhatsApp: {contato.whatsapp}</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_hours')}</span></li>
+                {contato.instagram && <li><span className={styles.footerStatic}>Instagram: {contato.instagram}</span></li>}
+                {contato.endereco && <li><span className={styles.footerStatic}>{contato.endereco}</span></li>}
+                <li><span className={styles.footerStatic}>{c('footer_extra')}</span></li>
               </ul>
             </div>
 
@@ -124,10 +120,10 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             <div className={styles.linkCol}>
               <h4 className={styles.colTitle}>Institucional</h4>
               <ul className={styles.linkList}>
-                <li><span className={styles.footerStatic}>Sobre a Luce D'Oro</span></li>
-                <li><span className={styles.footerStatic}>Nossos Mestres Ourives</span></li>
-                <li><span className={styles.footerStatic}>Política de Privacidade</span></li>
-                <li><span className={styles.footerStatic}>Termos de Uso</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_inst1')}</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_inst2')}</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_inst3')}</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_inst4')}</span></li>
               </ul>
             </div>
           </div>
@@ -135,7 +131,7 @@ export const Footer = ({ onNavigate }: FooterProps) => {
           {/* Bottom Bar */}
           <div className={styles.bottomBar}>
             <p className={styles.copyright}>
-              © {new Date().getFullYear()} Luce D'Oro Joalheria Contemporânea. Todos os direitos reservados. CNPJ 48.912.304/0001-92.
+              © {new Date().getFullYear()} Luce D'Oro Joalheria Contemporânea. Todos os direitos reservados. CNPJ {contato.cnpj}.
             </p>
 
             <div className={styles.securityBadges}>

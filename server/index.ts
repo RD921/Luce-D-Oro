@@ -11,6 +11,8 @@ import {
   logAudit,
   getOrCreateOwnerSetupKey,
 } from './db.js';
+import { registerAdminExtras } from './adminExtras.js';
+import { registerSiteContent } from './siteContent.js';
 
 initDatabase();
 
@@ -23,7 +25,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// O upload de imagens tem leitor próprio (aceita arquivos maiores), por isso é pulado aqui
+app.use((req, res, next) => (req.path === '/api/admin/uploads' ? next() : express.json()(req, res, next)));
 app.use(cookieParser());
 
 // Helper to authenticate request via Cookie or Authorization header
@@ -411,7 +414,7 @@ app.post('/api/admin/setup/verify-owner', authMiddleware, (req: AuthenticatedReq
 
 // Public Categories
 app.get('/api/catalog/categories', (_req: Request, res: Response) => {
-  const categories = db.prepare('SELECT * FROM categories ORDER BY name ASC').all();
+  const categories = db.prepare('SELECT * FROM categories WHERE COALESCE(is_active, 1) = 1 ORDER BY display_order ASC, name ASC').all();
   res.json(categories);
 });
 
@@ -808,6 +811,10 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 });
 
 // ==================== ADMIN EXCLUSIVE ROUTES (OWNER ONLY) ====================
+
+// Upload de imagens e categorias (arquivo separado)
+registerAdminExtras(app, ownerAuthMiddleware);
+registerSiteContent(app, ownerAuthMiddleware);
 
 // 1. Admin Dashboard Overview
 app.get('/api/admin/dashboard', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {

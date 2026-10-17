@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowUpDown, Sparkles, Loader2 } from 'lucide-react';
 import { api, type Product } from '../../services/api';
 import { ProductCard } from './ProductCard';
+import { useSite } from '../../context/SiteContext';
 import styles from './CategoryView.module.css';
 
 interface CategoryViewProps {
@@ -15,33 +16,22 @@ export const CategoryView = ({ categorySlug, onSelectProduct }: CategoryViewProp
   const [sortBy, setSortBy] = useState<string>('featured');
   const [materialFilter, setMaterialFilter] = useState<string>('all');
 
-  const categoryMeta: Record<string, { title: string; subtitle: string; description: string; banner: string }> = {
-    pulseiras: {
-      title: 'Pulseiras',
-      subtitle: 'COLEÇÃO PERMANENTE',
-      description: 'Elegância e presença esculpidas em ouro 18k. De modelos rígidos esculturais à clássica delicadeza da riviera, criadas para acompanhar todos os seus momentos.',
-      banner: '/images/category-pulseiras.jpg',
-    },
-    correntes: {
-      title: 'Correntes',
-      subtitle: 'COLEÇÃO PERMANENTE',
-      description: 'Elos meticulosamente forjados que capturam a luz natural com sutileza e sofisticação. Peças ideais para composições em camadas ou presença marcante em uso solo.',
-      banner: '/images/category-correntes.jpg',
-    },
-    brincos: {
-      title: 'Brincos',
-      subtitle: 'COLEÇÃO PERMANENTE',
-      description: 'O brilho nobre do ouro para iluminar a expressão com leveza e magnetismo. Argolas facetadas, pontos de luz puros e encaixes anatômicos.',
-      banner: '/images/category-brincos.jpg',
-    },
-  };
+  const { categories } = useSite();
+  const categoriaAtual = categories.find((c) => c.slug === categorySlug);
 
-  const currentMeta = categoryMeta[categorySlug] || {
-    title: 'Nossa Coleção',
-    subtitle: 'JOALHERIA CONTEMPORÂNEA',
-    description: "Explore o catálogo exclusivo Luce D'Oro e descubra joias criadas com matérias-primas nobres e rigor artesanal.",
-    banner: '/images/hero-editorial.jpg',
-  };
+  const currentMeta = categoriaAtual
+    ? {
+        title: categoriaAtual.name,
+        subtitle: 'COLEÇÃO PERMANENTE',
+        description: categoriaAtual.description || "Explore o catálogo exclusivo Luce D'Oro e descubra joias criadas com matérias-primas nobres e rigor artesanal.",
+        banner: categoriaAtual.image_url || '/images/hero-editorial.jpg',
+      }
+    : {
+        title: 'Nossa Coleção',
+        subtitle: 'JOALHERIA CONTEMPORÂNEA',
+        description: "Explore o catálogo exclusivo Luce D'Oro e descubra joias criadas com matérias-primas nobres e rigor artesanal.",
+        banner: '/images/hero-editorial.jpg',
+      };
 
   useEffect(() => {
     setLoading(true);

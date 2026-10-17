@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Sparkles, Award, Truck, RefreshCw, Gem, Clock } from 'lucide-react';
 import { api, type Product } from '../../services/api';
 import { ProductCard } from '../catalog/ProductCard';
+import { useSite } from '../../context/SiteContext';
 import styles from './HomeView.module.css';
 
 interface HomeViewProps {
@@ -11,6 +12,23 @@ interface HomeViewProps {
 
 export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps) => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const { categories, c, heroBanner } = useSite();
+
+  // Faixa principal: o primeiro banner ativo do painel (Banners). Sem banner, mostra o texto original.
+  const hero = {
+    pill: heroBanner?.badge || 'ALTA JOALHERIA CONTEMPORÂNEA',
+    title: heroBanner?.title || 'Detalhes que contam a sua história.',
+    subtitle: heroBanner?.subtitle ?? 'Joias forjadas em ouro nobre 18k com acabamento primoroso. O encontro harmonioso entre o luxo discreto e a autenticidade contemporânea.',
+    cta: heroBanner?.cta_text || 'Descubra a coleção',
+    image: heroBanner?.image_desktop || '/images/hero-luce-d-oro.png',
+  };
+
+  const handleHeroCta = () => {
+    const link = (heroBanner?.cta_link || '').trim();
+    if (/^https:\/\//.test(link)) window.location.href = link;
+    else if (link.startsWith('#') && link.length > 1) onNavigateCategory(link.slice(1).toLowerCase());
+    else onNavigateCategory(categories[0]?.slug || 'pulseiras');
+  };
 
   useEffect(() => {
     api.catalog
@@ -28,24 +46,24 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
             <div className={styles.heroContent}>
               <div className={styles.heroPill}>
                 <Sparkles size={13} color="#B89758" />
-                <span>ALTA JOALHERIA CONTEMPORÂNEA</span>
+                <span>{hero.pill}</span>
               </div>
 
               <h1 className={styles.heroTitle}>
-                Detalhes que contam a sua história.
+                {hero.title}
               </h1>
 
               <p className={styles.heroSubtitle}>
-                Joias forjadas em ouro nobre 18k com acabamento primoroso. O encontro harmonioso entre o luxo discreto e a autenticidade contemporânea.
+                {hero.subtitle}
               </p>
 
               <div className={styles.heroCtaRow}>
                 <button
-                  onClick={() => onNavigateCategory('pulseiras')}
+                  onClick={handleHeroCta}
                   className={`btn-primary ${styles.heroCta}`}
                   id="hero-cta-btn"
                 >
-                  <span>Descubra a coleção</span>
+                  <span>{hero.cta}</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -54,7 +72,7 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
             <div className={styles.heroVisualCol}>
               <div className={styles.heroImageWrapper}>
                 <img
-                  src="/images/hero-luce-d-oro.png"
+                  src={hero.image}
                   alt="Luce D'Oro Joalheria Contemporânea"
                   className={styles.heroBrandImage}
                 />
@@ -68,86 +86,38 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
       <section className={styles.categoriesSection}>
         <div className="container">
           <div className={styles.sectionHeader}>
-            <span className={styles.sectionCategoryTag}>UNIVERSO LUCE D'ORO</span>
-            <h2 className={styles.sectionTitle}>Nossas Coleções</h2>
+            <span className={styles.sectionCategoryTag}>{c('collections_tag')}</span>
+            <h2 className={styles.sectionTitle}>{c('collections_title')}</h2>
             <div className={styles.goldDivider} />
           </div>
 
           <div className={styles.categoriesGrid}>
-            {/* Pulseiras */}
-            <div
-              className={styles.categoryCard}
-              onClick={() => onNavigateCategory('pulseiras')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className={styles.categoryImageWrapper}>
-                <img
-                  src="/images/category-pulseiras.jpg"
-                  alt="Coleção de Pulseiras em Ouro 18k"
-                  className={styles.categoryImage}
-                />
-                <div className={styles.categoryCardOverlay} />
+            {categories.map((cat) => (
+              <div
+                key={cat.id}
+                className={styles.categoryCard}
+                onClick={() => onNavigateCategory(cat.slug)}
+                role="button"
+                tabIndex={0}
+              >
+                <div className={styles.categoryImageWrapper}>
+                  <img
+                    src={cat.image_url || '/images/hero-editorial.jpg'}
+                    alt={`Coleção de ${cat.name} em Ouro 18k`}
+                    className={styles.categoryImage}
+                  />
+                  <div className={styles.categoryCardOverlay} />
+                </div>
+                <div className={styles.categoryInfo}>
+                  <span className={styles.categorySub}>EXPLORAR</span>
+                  <h3 className={styles.categoryTitle}>{cat.name}</h3>
+                  <span className={styles.categoryLink}>
+                    <span>Ver coleção</span>
+                    <ArrowRight size={14} />
+                  </span>
+                </div>
               </div>
-              <div className={styles.categoryInfo}>
-                <span className={styles.categorySub}>EXPLORAR</span>
-                <h3 className={styles.categoryTitle}>Pulseiras</h3>
-                <span className={styles.categoryLink}>
-                  <span>Ver coleção</span>
-                  <ArrowRight size={14} />
-                </span>
-              </div>
-            </div>
-
-            {/* Correntes */}
-            <div
-              className={styles.categoryCard}
-              onClick={() => onNavigateCategory('correntes')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className={styles.categoryImageWrapper}>
-                <img
-                  src="/images/category-correntes.jpg"
-                  alt="Coleção de Correntes e Gargantilhas em Ouro 18k"
-                  className={styles.categoryImage}
-                />
-                <div className={styles.categoryCardOverlay} />
-              </div>
-              <div className={styles.categoryInfo}>
-                <span className={styles.categorySub}>EXPLORAR</span>
-                <h3 className={styles.categoryTitle}>Correntes</h3>
-                <span className={styles.categoryLink}>
-                  <span>Ver coleção</span>
-                  <ArrowRight size={14} />
-                </span>
-              </div>
-            </div>
-
-            {/* Brincos */}
-            <div
-              className={styles.categoryCard}
-              onClick={() => onNavigateCategory('brincos')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className={styles.categoryImageWrapper}>
-                <img
-                  src="/images/category-brincos.jpg"
-                  alt="Coleção de Brincos e Argolas em Ouro 18k"
-                  className={styles.categoryImage}
-                />
-                <div className={styles.categoryCardOverlay} />
-              </div>
-              <div className={styles.categoryInfo}>
-                <span className={styles.categorySub}>EXPLORAR</span>
-                <h3 className={styles.categoryTitle}>Brincos</h3>
-                <span className={styles.categoryLink}>
-                  <span>Ver coleção</span>
-                  <ArrowRight size={14} />
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -156,8 +126,8 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
       <section className={styles.featuredSection}>
         <div className="container">
           <div className={styles.sectionHeader}>
-            <span className={styles.sectionCategoryTag}>SELEÇÃO EDITORIAL</span>
-            <h2 className={styles.sectionTitle}>Joias em Destaque</h2>
+            <span className={styles.sectionCategoryTag}>{c('featured_tag')}</span>
+            <h2 className={styles.sectionTitle}>{c('featured_title')}</h2>
             <p className={styles.sectionDesc}>
               Uma curadoria de peças que sintetizam o ápice do design refinado e da excelência artesanal.
             </p>
@@ -182,22 +152,22 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
             <div className={styles.materialsImageCol}>
               <div className={styles.materialsImageWrapper}>
                 <img
-                  src="/images/materials-macro.jpg"
+                  src={c('materials_image')}
                   alt="Detalhe macro de fecho gaveta em ouro 18k e ourivesaria artesanal"
                   className={styles.materialsImage}
                 />
                 <div className={styles.materialsPill}>
                   <Award size={14} color="#B89758" />
-                  <span>Atelier de Ourivesaria</span>
+                  <span>{c('materials_pill')}</span>
                 </div>
               </div>
             </div>
 
             <div className={styles.materialsTextCol}>
-              <span className={styles.sectionCategoryTag}>RIGOR E MATÉRIA-PRIMA</span>
-              <h2 className={styles.materialsTitle}>A Pureza do Ouro 18k e a Mestria do Acabamento</h2>
+              <span className={styles.sectionCategoryTag}>{c('materials_tag')}</span>
+              <h2 className={styles.materialsTitle}>{c('materials_title')}</h2>
               <p className={styles.materialsLead}>
-                Cada joia Luce D'Oro recebe 10 milésimos de Ouro 18k sobre liga nobre sem níquel, blindada com verniz nanocerâmico suíço que assegura brilho inalterado e toque aveludado na pele.
+                {c('materials_lead')}
               </p>
 
               <div className={styles.specsList}>
@@ -206,8 +176,8 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
                     <Gem size={18} color="#B89758" />
                   </div>
                   <div>
-                    <h4 className={styles.specTitle}>10 Milésimos de Ouro 18k</h4>
-                    <p className={styles.specDesc}>Camada de altíssima espessura que confere a densidade e o tom caloroso do ouro puro.</p>
+                    <h4 className={styles.specTitle}>{c('spec1_title')}</h4>
+                    <p className={styles.specDesc}>{c('spec1_desc')}</p>
                   </div>
                 </div>
 
@@ -216,8 +186,8 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
                     <ShieldCheck size={18} color="#B89758" />
                   </div>
                   <div>
-                    <h4 className={styles.specTitle}>Verniz Suíço Nanotecnológico</h4>
-                    <p className={styles.specDesc}>Proteção invisível contra oxidação e suor, 100% hipoalergênica e livre de níquel.</p>
+                    <h4 className={styles.specTitle}>{c('spec2_title')}</h4>
+                    <p className={styles.specDesc}>{c('spec2_desc')}</p>
                   </div>
                 </div>
 
@@ -226,8 +196,8 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
                     <Clock size={18} color="#B89758" />
                   </div>
                   <div>
-                    <h4 className={styles.specTitle}>Garantia Vitalícia do Teor</h4>
-                    <p className={styles.specDesc}>Certificado individual assinado com garantia total contra defeitos de fabricação.</p>
+                    <h4 className={styles.specTitle}>{c('spec3_title')}</h4>
+                    <p className={styles.specDesc}>{c('spec3_desc')}</p>
                   </div>
                 </div>
               </div>
@@ -240,17 +210,17 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
       <section className={styles.brandStorySection}>
         <div className="container">
           <div className={styles.storyCard}>
-            <span className={styles.storyTag}>O MANIFESTO LUCE D'ORO</span>
-            <h2 className={styles.storyTitle}>Luxo Silencioso, Elegância Eterna</h2>
+            <span className={styles.storyTag}>{c('story_tag')}</span>
+            <h2 className={styles.storyTitle}>{c('story_title')}</h2>
             <p className={styles.storyParagraph}>
-              Nascemos da convicção de que o verdadeiro luxo não precisa gritar para ser percebido. Ele reside no peso preciso de uma corrente que repousa sobre a pele, no clique perfeito de uma trava gaveta e no brilho dourado que atravessa gerações.
+              {c('story_p1')}
             </p>
             <p className={styles.storyParagraphSecondary}>
-              A Luce D'Oro une a herança da ourivesaria clássica ao minimalismo da joalheria contemporânea, criando símbolos de afeto, conquista e identidade pessoal.
+              {c('story_p2')}
             </p>
             <div className={styles.signature}>
               <img src="/images/logo-header.png" alt="Luce D'Oro" className={styles.signatureLogo} />
-              <span className={styles.signatureText}>Joalheria Contemporânea</span>
+              <span className={styles.signatureText}>{c('story_signature')}</span>
             </div>
           </div>
         </div>
@@ -264,9 +234,9 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
               <div className={styles.trustIconCircle}>
                 <Truck size={24} color="#B89758" />
               </div>
-              <h3 className={styles.trustTitle}>Envio Seguro com Seguro Total</h3>
+              <h3 className={styles.trustTitle}>{c('trust1_title')}</h3>
               <p className={styles.trustDesc}>
-                Transporte monitorado com cobertura integral até as suas mãos. Frete cortesia para pedidos acima de R$ 500.
+                {c('trust1_desc')}
               </p>
             </div>
 
@@ -274,9 +244,9 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
               <div className={styles.trustIconCircle}>
                 <Award size={24} color="#B89758" />
               </div>
-              <h3 className={styles.trustTitle}>Certificado de Garantia</h3>
+              <h3 className={styles.trustTitle}>{c('trust2_title')}</h3>
               <p className={styles.trustDesc}>
-                Todas as joias acompanham livreto numerado com certificado oficial de qualidade e autenticidade do ouro.
+                {c('trust2_desc')}
               </p>
             </div>
 
@@ -284,9 +254,9 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
               <div className={styles.trustIconCircle}>
                 <RefreshCw size={24} color="#B89758" />
               </div>
-              <h3 className={styles.trustTitle}>Primeira Troca Cortesia</h3>
+              <h3 className={styles.trustTitle}>{c('trust3_title')}</h3>
               <p className={styles.trustDesc}>
-                Até 30 dias para experimentar suas peças com total tranquilidade no conforto de sua casa.
+                {c('trust3_desc')}
               </p>
             </div>
 
@@ -294,9 +264,9 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
               <div className={styles.trustIconCircle}>
                 <ShieldCheck size={24} color="#B89758" />
               </div>
-              <h3 className={styles.trustTitle}>Atendimento Concierge</h3>
+              <h3 className={styles.trustTitle}>{c('trust4_title')}</h3>
               <p className={styles.trustDesc}>
-                Especialistas à disposição via WhatsApp e e-mail para consultoria de estilos, medidas e presentes especiais.
+                {c('trust4_desc')}
               </p>
             </div>
           </div>

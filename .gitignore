@@ -32,3 +32,5 @@ data/
 *.db
 .env
 node_modules/
+
+uploads/
