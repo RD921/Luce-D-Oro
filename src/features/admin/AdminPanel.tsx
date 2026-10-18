@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
-import { api, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData } from '../../services/api';
+import { api, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights } from '../../services/api';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -166,7 +166,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         <nav className={styles.sidebarNav}>
           {grupos.map(g => (
             <div key={g} className={styles.navSection}>
-              <div className={styles.navSectionLabel}>{g.replace('&', '&amp;')}</div>
+              <div className={styles.navSectionLabel}>{g}</div>
               {abas.filter(t => t.group === g).map(tab => (
                 <button
                   key={tab.id}
@@ -228,18 +228,85 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 // ============================================================
 // TAB: DASHBOARD
 // ============================================================
+// ---- Gráficos do dashboard (SVG simples, uma cor só: dourado) ----
+function Delta({ atual, antes }: { atual: number; antes: number }) {
+  if (antes <= 0) return <span style={{ color: 'var(--adm-text-dim)' }}> · sem base anterior</span>;
+  const pct = ((atual - antes) / antes) * 100;
+  const sobe = pct >= 0;
+  return (
+    <span style={{ color: sobe ? 'var(--adm-green)' : 'var(--adm-red)' }}>
+      {' · '}{sobe ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}% vs. período anterior
+    </span>
+  );
+}
+
+function RevenueChart({ serie }: { serie: DashboardInsights['serie'] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const W = 720, H = 200, PL = 8, PB = 22;
+  const max = Math.max(1, ...serie.map(d => d.receita));
+  const largura = (W - PL) / serie.length;
+  const barra = Math.max(2, Math.min(24, largura - 3));
+  const temVenda = serie.some(d => d.receita > 0);
+  const marca = (i: number) => serie.length <= 14 || (serie.length - 1 - i) % Math.ceil(serie.length / 8) === 0;
+  const h = hover !== null ? serie[hover] : null;
+  return (
+    <div>
+      <div style={{ minHeight: 20, fontSize: '0.8rem', marginBottom: 6, color: 'var(--adm-text-muted)' }}>
+        {h ? <><strong style={{ color: 'var(--adm-text)' }}>{fmt(h.receita)}</strong> · {h.pedidos} pedido(s) · {h.dia.split('-').reverse().join('/')}</>
+           : temVenda ? 'Passe o mouse sobre uma barra para ver o dia.' : 'Ainda não há vendas neste período.'}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Receita por dia" style={{ display: 'block' }}>
+        <line x1={PL} x2={W} y1={H - PB} y2={H - PB} stroke="rgba(255,255,255,0.12)" />
+        {serie.map((d, i) => {
+          const alt = d.receita > 0 ? Math.max(3, (d.receita / max) * (H - PB - 10)) : 0;
+          const x = PL + i * largura + (largura - barra) / 2;
+          return (
+            <g key={d.dia} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+              <rect x={PL + i * largura} y={0} width={largura} height={H - PB} fill="transparent" />
+              {alt > 0 && <rect x={x} y={H - PB - alt} width={barra} height={alt} rx={2} fill={hover === i ? 'var(--adm-gold-light)' : 'var(--adm-gold)'} />}
+              {marca(i) && <text x={x + barra / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--adm-text-muted)">{d.dia.slice(8)}/{d.dia.slice(5, 7)}</text>}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function HBars({ linhas, vazio }: { linhas: Array<{ nome: string; valor: number; detalhe: string }>; vazio: string }) {
+  const max = Math.max(1, ...linhas.map(l => l.valor));
+  if (linhas.length === 0) return <div className={styles.emptyState}>{vazio}</div>;
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {linhas.map(l => (
+        <div key={l.nome}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: 3 }}>
+            <span>{l.nome}</span>
+            <span style={{ color: 'var(--adm-text-muted)' }}>{fmt(l.valor)} · {l.detalhe}</span>
+          </div>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+            <div style={{ width: `${(l.valor / max) * 100}%`, height: '100%', background: 'var(--adm-gold)', borderRadius: 3 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DashboardTab() {
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [alerts, setAlerts] = useState<AdminAlert[]>([]);
+  const [ins, setIns] = useState<DashboardInsights | null>(null);
   const [period, setPeriod] = useState('30d');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, a] = await Promise.all([api.admin.getDashboard(period), api.admin.getAlerts()]);
+      const [d, a, i] = await Promise.all([api.admin.getDashboard(period), api.admin.getAlerts(), api.admin.getInsights(period).catch(() => null)]);
       setData(d);
       setAlerts(a);
+      setIns(i);
     } catch {/* */}
     setLoading(false);
   }, [period]);
@@ -250,6 +317,8 @@ function DashboardTab() {
   if (!data) return <div className={styles.emptyState}>Erro ao carregar dados.</div>;
 
   const statusEntries = Object.entries(data.statusCounts);
+  const receitaAtual = ins ? ins.serie.reduce((a, d) => a + d.receita, 0) : 0;
+  const pedidosAtual = ins ? ins.serie.reduce((a, d) => a + d.pedidos, 0) : 0;
 
   return (
     <>
@@ -289,7 +358,7 @@ function DashboardTab() {
         <div className={`${styles.metricCard} ${styles.metricGold}`}>
           <div className={styles.metricLabel}>Receita</div>
           <div className={styles.metricValue}>{fmt(data.revenue)}</div>
-          <div className={styles.metricSub}>{data.ordersCount} pedidos</div>
+          <div className={styles.metricSub}>{data.ordersCount} pedidos{ins?.anterior && <Delta atual={receitaAtual} antes={ins.anterior.receita} />}</div>
         </div>
         <div className={styles.metricCard}>
           <div className={styles.metricLabel}>Ticket Médio</div>
@@ -304,9 +373,56 @@ function DashboardTab() {
         <div className={styles.metricCard}>
           <div className={styles.metricLabel}>Clientes</div>
           <div className={styles.metricValue}>{data.totalCustomers}</div>
-          <div className={styles.metricSub}>{data.activeCoupons} cupons ativos</div>
+          <div className={styles.metricSub}>{ins ? `${ins.novosClientes} novo(s) no período · ` : ''}{data.activeCoupons} cupons ativos</div>
         </div>
       </div>
+
+      {ins && (
+        <>
+          <div className={styles.metricsGrid}>
+            <div className={`${styles.metricCard} ${ins.aguardando > 0 ? styles.metricGold : ''}`}>
+              <div className={styles.metricLabel}>Pedidos para atender</div>
+              <div className={styles.metricValue}>{ins.aguardando}</div>
+              <div className={styles.metricSub}>confirmados, pagos ou em preparação</div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Pedidos no período</div>
+              <div className={styles.metricValue}>{pedidosAtual}</div>
+              <div className={styles.metricSub}>sem cancelados{ins.anterior && <Delta atual={pedidosAtual} antes={ins.anterior.pedidos} />}</div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Peças em estoque</div>
+              <div className={styles.metricValue}>{ins.estoque.pecas}</div>
+              <div className={styles.metricSub}>{fmt(ins.estoque.venda)} em preço de venda</div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Margem potencial</div>
+              <div className={styles.metricValue}>{ins.estoque.custo > 0 ? fmt(ins.estoque.venda - ins.estoque.custo) : '—'}</div>
+              <div className={styles.metricSub}>{ins.estoque.custo > 0 ? 'estoque a preço de venda − custo' : 'cadastre o custo dos produtos'}</div>
+            </div>
+          </div>
+
+          <div className={styles.sectionHeader}><span className={styles.sectionTitle}>Receita por dia</span></div>
+          <div className={styles.tableWrapper} style={{ padding: '1rem', marginBottom: '1.5rem' }}>
+            <RevenueChart serie={ins.serie} />
+          </div>
+
+          <div className={styles.twoColGrid} style={{ marginBottom: '1.5rem' }}>
+            <div>
+              <div className={styles.sectionHeader}><span className={styles.sectionTitle}>Vendas por categoria</span></div>
+              <div className={styles.tableWrapper} style={{ padding: '1rem' }}>
+                <HBars linhas={ins.porCategoria.map(c => ({ nome: c.nome, valor: c.receita, detalhe: `${c.itens} item(ns)` }))} vazio="Sem vendas no período." />
+              </div>
+            </div>
+            <div>
+              <div className={styles.sectionHeader}><span className={styles.sectionTitle}>Formas de pagamento</span></div>
+              <div className={styles.tableWrapper} style={{ padding: '1rem' }}>
+                <HBars linhas={ins.pagamentos.map(c => ({ nome: c.metodo || 'Não informado', valor: c.receita, detalhe: `${c.pedidos} pedido(s)` }))} vazio="Sem vendas no período." />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Status distribution */}
       {statusEntries.length > 0 && (
@@ -414,7 +530,9 @@ function ProductsTab() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Product | null>(null);
+  const [photosOf, setPhotosOf] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
+  const [verArquivados, setVerArquivados] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -425,9 +543,11 @@ function ProductsTab() {
   useEffect(() => { load(); }, []);
 
   const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category_id.toLowerCase().includes(search.toLowerCase())
+    Boolean(p.is_archived) === verArquivados &&
+    (p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.category_id.toLowerCase().includes(search.toLowerCase()))
   );
+  const qtdArquivados = products.filter(p => p.is_archived).length;
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Deseja arquivar o produto "${name}"? Ele não será exibido na loja.`)) return;
@@ -437,9 +557,20 @@ function ProductsTab() {
     } catch (e: any) { alert(e.message); }
   };
 
+  const restaurar = async (p: Product) => {
+    try { await api.admin.restoreProduct(p.id); await load(); } catch (e: any) { alert(e.message); }
+  };
+  const apagarDeVez = async (p: Product) => {
+    if (!confirm(`Apagar "${p.name}" DE VEZ? Isso não tem volta.`)) return;
+    try { await api.admin.deleteProductForever(p.id); await load(); } catch (e: any) { alert(e.message); }
+  };
+
   return (
     <>
       <div className={styles.filterRow}>
+        <button className={`${styles.btnSmall} ${verArquivados ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setVerArquivados(v => !v)}>
+          {verArquivados ? '← Voltar aos ativos' : `Arquivados (${qtdArquivados})`}
+        </button>
         <Search size={14} style={{ color: 'var(--adm-text-dim)', flexShrink: 0 }} />
         <input
           className={styles.searchInput}
@@ -478,6 +609,9 @@ function ProductsTab() {
                         src={p.image_primary}
                         alt={p.name}
                         className={styles.productImg}
+                        style={{ cursor: 'pointer' }}
+                        title="Clique para trocar as fotos"
+                        onClick={() => setPhotosOf(p)}
                         onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
                       />
                     </td>
@@ -506,6 +640,9 @@ function ProductsTab() {
                     </td>
                     <td>
                       <div className={styles.actionBtns}>
+                        <button className={styles.btnIcon} title="Trocar fotos" onClick={() => setPhotosOf(p)}>
+                          <Image size={13} />
+                        </button>
                         <button
                           className={styles.btnIcon}
                           title="Editar"
@@ -513,13 +650,18 @@ function ProductsTab() {
                         >
                           <Edit2 size={13} />
                         </button>
-                        <button
-                          className={`${styles.btnIcon} ${styles.btnIconDanger}`}
-                          title="Arquivar"
-                          onClick={() => handleDelete(p.id, p.name)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {p.is_archived ? (
+                          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => restaurar(p)}>Restaurar</button>
+                        ) : (
+                          <button
+                            className={`${styles.btnIcon} ${styles.btnIconDanger}`}
+                            title="Arquivar (tira da loja, mantém o histórico)"
+                            onClick={() => handleDelete(p.id, p.name)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ color: 'var(--adm-red)' }} title="Apagar de vez" onClick={() => apagarDeVez(p)}>Apagar</button>
                       </div>
                     </td>
                   </tr>
@@ -530,6 +672,7 @@ function ProductsTab() {
         </div>
       </div>
 
+      {photosOf && <PhotosModal product={photosOf} onClose={() => setPhotosOf(null)} onSaved={() => { setPhotosOf(null); load(); }} />}
       {(editing || creating) && (
         <ProductModal
           product={editing || undefined}
@@ -538,6 +681,81 @@ function ProductsTab() {
         />
       )}
     </>
+  );
+}
+
+// ---- Editor de fotos do produto ----
+function PhotosModal({ product, onClose, onSaved }: { product: Product; onClose: () => void; onSaved: () => void }) {
+  const [principal, setPrincipal] = useState(product.image_primary);
+  const [extras, setExtras] = useState<string[]>(product.images ?? []);
+  const [url, setUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const todas = [principal, ...extras].filter(Boolean);
+  const virarPrincipal = (u: string) => { setExtras(e => [principal, ...e.filter(x => x !== u)].filter(Boolean)); setPrincipal(u); };
+  const remover = (u: string) => {
+    if (u === principal) {
+      if (extras.length === 0) { setError('O produto precisa de pelo menos uma foto. Envie outra antes de remover esta.'); return; }
+      setPrincipal(extras[0]); setExtras(extras.slice(1));
+    } else setExtras(e => e.filter(x => x !== u));
+    setError('');
+  };
+  const adicionar = (u: string) => {
+    if (!u) return;
+    if (!principal) setPrincipal(u);
+    else setExtras(e => (e.includes(u) || u === principal ? e : [...e, u]));
+  };
+  const trocarPrincipal = (u: string) => {
+    // troca a foto principal pela nova; a antiga sai da galeria
+    setPrincipal(u);
+    setExtras(e => e.filter(x => x !== u));
+  };
+
+  const salvar = async () => {
+    if (!principal) { setError('Escolha a foto principal.'); return; }
+    setSaving(true); setError('');
+    try { await api.admin.setProductPhotos(product.id, principal, extras); onSaved(); }
+    catch (e: any) { setError(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={`${styles.modal} ${styles.modalLarge}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>Fotos — {product.name}</span>
+          <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className={styles.modalBody}>
+          {error && <div className={`${styles.alertRow} ${styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{error}</div></div>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: '1rem' }}>
+            {todas.map((u, i) => (
+              <div key={u} style={{ border: `1px solid ${u === principal ? 'var(--adm-gold)' : 'var(--adm-border-md)'}`, borderRadius: 6, overflow: 'hidden', background: 'var(--adm-bg-input)' }}>
+                <img src={u} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.2'; }} />
+                <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: '0.65rem', color: u === principal ? 'var(--adm-gold)' : 'var(--adm-text-muted)' }}>{u === principal ? '★ Principal' : `Foto ${i + 1}`}</span>
+                  {u !== principal && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => virarPrincipal(u)}>Tornar principal</button>}
+                  <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ color: 'var(--adm-red)' }} onClick={() => remover(u)}>Remover</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+            <UploadButton label="Adicionar foto" onUploaded={adicionar} />
+            <UploadButton label="Trocar a principal" onUploaded={trocarPrincipal} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className={styles.formInput} placeholder="…ou cole o endereço (link) de uma imagem" value={url} onChange={e => setUrl(e.target.value)} />
+            <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} disabled={!url.trim()} onClick={() => { adicionar(url.trim()); setUrl(''); }}>Adicionar</button>
+          </div>
+        </div>
+        <div className={styles.modalFooter}>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={salvar} disabled={saving}>{saving ? 'Salvando…' : 'Salvar fotos'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -899,7 +1117,9 @@ function StockTab() {
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adjusting, setAdjusting] = useState<{ product: Product; qty: string; reason: string } | null>(null);
+  const { user, isOwner } = useAuth();
+  const podeApagar = isOwner || user?.areas?.produtos === 'rw';
+  const [adjusting, setAdjusting] = useState<{ product: Product; qty: string; reason: string; modo: 'somar' | 'definir' } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -914,15 +1134,29 @@ function StockTab() {
   useEffect(() => { load(); }, []);
 
   const handleAdjust = async () => {
-    if (!adjusting || !adjusting.qty || !adjusting.reason) {
-      alert('Informe a quantidade e o motivo do ajuste.');
-      return;
-    }
+    if (!adjusting) return;
+    if (adjusting.qty === '') { alert('Informe a quantidade.'); return; }
     try {
-      await api.admin.adjustStock(adjusting.product.id, Number(adjusting.qty), adjusting.reason);
+      if (adjusting.modo === 'definir') {
+        await api.admin.setStock(adjusting.product.id, Number(adjusting.qty), adjusting.reason.trim());
+      } else {
+        if (!adjusting.reason.trim()) { alert('Informe o motivo do ajuste.'); return; }
+        await api.admin.adjustStock(adjusting.product.id, Number(adjusting.qty), adjusting.reason);
+      }
       setAdjusting(null);
       load();
     } catch (e: any) { alert(e.message); }
+  };
+
+  const apagar = async (p: Product) => {
+    if (!confirm(`Apagar "${p.name}" do estoque e da loja?\n\nSe já houve vendas dele, ele será apenas arquivado (some da loja, mantém o histórico).`)) return;
+    try {
+      await api.admin.deleteProductForever(p.id);
+    } catch {
+      try { await api.admin.deleteProduct(p.id); alert('Este produto já tem vendas: foi arquivado em vez de apagado (volta em Produtos → Arquivados).'); }
+      catch (e: any) { alert(e.message); return; }
+    }
+    load();
   };
 
   return (
@@ -933,7 +1167,7 @@ function StockTab() {
           <div className={styles.tableWrapper}>
             {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
               <table>
-                <thead><tr><th>Produto</th><th>Estoque</th><th>Ajustar</th></tr></thead>
+                <thead><tr><th>Produto</th><th>Estoque</th><th>Quantidade</th></tr></thead>
                 <tbody>
                   {products.map(p => (
                     <tr key={p.id}>
@@ -947,10 +1181,15 @@ function StockTab() {
                       <td>
                         <button
                           className={`${styles.btnSmall} ${styles.btnSmallGhost}`}
-                          onClick={() => setAdjusting({ product: p, qty: '', reason: '' })}
+                          onClick={() => setAdjusting({ product: p, qty: String(p.stock), reason: '', modo: 'definir' })}
                         >
-                          <Edit2 size={11} /> Ajustar
+                          <Edit2 size={11} /> Alterar
                         </button>
+                        {podeApagar && (
+                          <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} style={{ marginLeft: 6 }} title="Apagar produto" onClick={() => apagar(p)}>
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -993,7 +1232,7 @@ function StockTab() {
         <div className={styles.modalOverlay} onClick={() => setAdjusting(null)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <span className={styles.modalTitle}>Ajustar Estoque — {adjusting.product.name}</span>
+              <span className={styles.modalTitle}>Estoque — {adjusting.product.name}</span>
               <button className={styles.modalCloseBtn} onClick={() => setAdjusting(null)}><X size={16} /></button>
             </div>
             <div className={styles.modalBody}>
@@ -1003,21 +1242,26 @@ function StockTab() {
                   {adjusting.product.stock} unidades
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+                <button className={`${styles.btnSmall} ${adjusting.modo === 'definir' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAdjusting(a => a ? { ...a, modo: 'definir', qty: String(a.product.stock) } : null)}>Definir total</button>
+                <button className={`${styles.btnSmall} ${adjusting.modo === 'somar' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAdjusting(a => a ? { ...a, modo: 'somar', qty: '' } : null)}>Somar / subtrair</button>
+              </div>
               <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                <label className={styles.formLabel}>Variação de quantidade (use - para reduzir)</label>
+                <label className={styles.formLabel}>{adjusting.modo === 'definir' ? 'Nova quantidade em estoque' : 'Variação de quantidade (use - para reduzir)'}</label>
                 <input
                   type="number"
                   className={styles.formInput}
-                  placeholder="Ex: +5 ou -2"
+                  placeholder={adjusting.modo === 'definir' ? 'Ex: 12' : 'Ex: +5 ou -2'}
+                  min={adjusting.modo === 'definir' ? 0 : undefined}
                   value={adjusting.qty}
                   onChange={e => setAdjusting(a => a ? { ...a, qty: e.target.value } : null)}
                 />
               </div>
               <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Motivo do ajuste *</label>
+                <label className={styles.formLabel}>Motivo{adjusting.modo === 'somar' ? ' *' : ' (opcional)'}</label>
                 <input
                   className={styles.formInput}
-                  placeholder="Ex: Recebimento de mercadoria, Devolução, Correção de inventário"
+                  placeholder="Ex: Recebimento de mercadoria, Devolução, Contagem do inventário"
                   value={adjusting.reason}
                   onChange={e => setAdjusting(a => a ? { ...a, reason: e.target.value } : null)}
                 />
@@ -1025,7 +1269,7 @@ function StockTab() {
             </div>
             <div className={styles.modalFooter}>
               <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setAdjusting(null)}>Cancelar</button>
-              <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={handleAdjust}>Confirmar Ajuste</button>
+              <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={handleAdjust}>Salvar</button>
             </div>
           </div>
         </div>
@@ -1142,9 +1386,30 @@ function CategoriesTab() {
 
   const afterChange = () => { load(); void refreshCategories(); };
 
+  const [movendo, setMovendo] = useState<{ cat: Category; destino: string } | null>(null);
+
   const handleDelete = async (c: Category) => {
+    if ((c.product_count ?? 0) > 0) {
+      const outras = items.filter(x => x.id !== c.id);
+      if (outras.length === 0) { alert('Esta categoria tem produtos e não há outra para recebê-los. Crie outra categoria primeiro.'); return; }
+      setMovendo({ cat: c, destino: outras[0].id });
+      return;
+    }
     if (!confirm(`Excluir a categoria "${c.name}"?`)) return;
     try { await api.admin.deleteCategory(c.id); afterChange(); } catch (e: any) { alert(e.message); }
+  };
+
+  const confirmarMover = async () => {
+    if (!movendo) return;
+    try { await api.admin.deleteCategory(movendo.cat.id, movendo.destino); setMovendo(null); afterChange(); } catch (e: any) { alert(e.message); }
+  };
+
+  const mover = async (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const ids = items.map(c => c.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try { await api.admin.reorderCategories(ids); afterChange(); } catch (e: any) { alert(e.message); }
   };
 
   const toggleActive = async (c: Category) => {
@@ -1166,13 +1431,16 @@ function CategoriesTab() {
             <thead><tr><th>Imagem</th><th>Nome</th><th>Endereço</th><th>Produtos</th><th>Ordem</th><th>Na loja</th><th>Ações</th></tr></thead>
             <tbody>
               {items.length === 0 && <tr><td colSpan={7} className={styles.emptyState}>Nenhuma categoria criada.</td></tr>}
-              {items.map(c => (
+              {items.map((c, i) => (
                 <tr key={c.id}>
                   <td>{c.image_url && <img src={c.image_url} alt={c.name} className={styles.productImg} style={{ width: 60, height: 36 }} onError={() => {}} />}</td>
                   <td className={styles.productName}>{c.name}</td>
                   <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>#{c.slug}</td>
                   <td>{c.product_count ?? 0}</td>
-                  <td>{c.display_order ?? 0}</td>
+                  <td>
+                    <button className={styles.btnIcon} disabled={i === 0} onClick={() => mover(i, -1)} title="Subir">▲</button>
+                    <button className={styles.btnIcon} disabled={i === items.length - 1} onClick={() => mover(i, 1)} title="Descer" style={{ marginLeft: 4 }}>▼</button>
+                  </td>
                   <td>
                     <button className={`${styles.statusPill} ${c.is_active ? styles.statusConfirmed : styles.statusCancelled}`} style={{ cursor: 'pointer', border: 'none' }} onClick={() => toggleActive(c)} title="Clique para mostrar/esconder na loja">
                       {c.is_active ? 'Visível' : 'Oculta'}
@@ -1191,6 +1459,26 @@ function CategoriesTab() {
         )}
       </div>
 
+      {movendo && (
+        <div className={styles.modalOverlay} onClick={() => setMovendo(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>Excluir "{movendo.cat.name}"</span>
+              <button className={styles.modalCloseBtn} onClick={() => setMovendo(null)}><X size={16} /></button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: '0.85rem', marginTop: 0 }}>Esta categoria tem {movendo.cat.product_count} produto(s). Para onde eles devem ir?</p>
+              <select className={styles.formInput} value={movendo.destino} onChange={e => setMovendo(m => m ? { ...m, destino: e.target.value } : null)}>
+                {items.filter(x => x.id !== movendo.cat.id).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setMovendo(null)}>Cancelar</button>
+              <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={confirmarMover}>Mover produtos e excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
       {(editing || creating) && (
         <CategoryModal
           category={editing || undefined}

@@ -129,15 +129,24 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
     const id = String(req.params.id);
     const atual = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id) as { id: string; name: string } | undefined;
     if (!atual) { res.status(404).json({ error: 'Categoria não encontrada.' }); return; }
-    // Produtos (inclusive arquivados) e pedidos antigos dependem da categoria: só apaga se estiver vazia.
+    // Produtos (inclusive arquivados) e pedidos antigos dependem da categoria: só apaga se estiver vazia,
+    // ou se o painel pedir para mover os produtos para outra categoria (?moveTo=...).
     const usados = (db.prepare('SELECT COUNT(*) AS n FROM products WHERE category_id = ?').get(id) as { n: number }).n;
+    const destino = typeof req.query.moveTo === 'string' ? req.query.moveTo : '';
     if (usados > 0) {
-      res.status(409).json({ error: `Esta categoria tem ${usados} produto(s) (contando os arquivados). Mova-os para outra categoria ou desative a categoria em vez de excluir.` });
-      return;
+      if (!destino) {
+        res.status(409).json({ error: `Esta categoria tem ${usados} produto(s) (contando os arquivados). Mova-os para outra categoria ou desative a categoria em vez de excluir.`, products: usados });
+        return;
+      }
+      if (destino === id || !db.prepare('SELECT id FROM categories WHERE id = ?').get(destino)) {
+        res.status(400).json({ error: 'Categoria de destino inválida.' });
+        return;
+      }
+      db.prepare('UPDATE products SET category_id = ? WHERE category_id = ?').run(destino, id);
     }
     db.prepare('DELETE FROM categories WHERE id = ?').run(id);
     const u = dono(req);
-    logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_DELETED', entity: 'CATEGORIES', entityId: id, details: { name: atual.name } });
+    logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_DELETED', entity: 'CATEGORIES', entityId: id, details: { name: atual.name, movidos: usados, destino: destino || null } });
     res.json({ success: true, message: 'Categoria excluída.' });
   });
 }

@@ -150,6 +150,18 @@ export interface AdminAlert {
   link?: string;
 }
 
+export interface DashboardInsights {
+  periodo: string;
+  dias: number;
+  serie: Array<{ dia: string; pedidos: number; receita: number }>;
+  anterior: { pedidos: number; receita: number } | null;
+  porCategoria: Array<{ nome: string; receita: number; itens: number }>;
+  pagamentos: Array<{ metodo: string; pedidos: number; receita: number }>;
+  novosClientes: number;
+  aguardando: number;
+  estoque: { venda: number; custo: number; pecas: number };
+}
+
 export interface AdminDashboardData {
   period: string;
   ordersCount: number;
@@ -466,10 +478,32 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    deleteCategory: (id: string) =>
-      request<{ success: boolean; message: string }>(`/api/admin/categories/${id}`, {
+    deleteCategory: (id: string, moveTo?: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/categories/${id}${moveTo ? `?moveTo=${encodeURIComponent(moveTo)}` : ''}`, {
         method: 'DELETE',
       }),
+
+    reorderCategories: (ids: string[]) =>
+      request<{ success: boolean; message: string }>('/api/admin/categories-order', { method: 'PUT', body: JSON.stringify({ ids }) }),
+
+    // ---- Fotos, estoque exato, exclusão de produtos ----
+    setProductPhotos: (id: string, image_primary: string, images: string[]) =>
+      request<{ success: boolean; image_primary: string; images: string[]; message: string }>(`/api/admin/products/${id}/photos`, {
+        method: 'PUT',
+        body: JSON.stringify({ image_primary, images }),
+      }),
+    setStock: (productId: string, quantity: number, reason: string) =>
+      request<{ success: boolean; newStock: number; message: string }>('/api/admin/stock/set', {
+        method: 'POST',
+        body: JSON.stringify({ productId, quantity, reason }),
+      }),
+    restoreProduct: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/products/${id}/restore`, { method: 'POST' }),
+    deleteProductForever: (id: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/products/${id}/permanent`, { method: 'DELETE' }),
+
+    getInsights: (period = '30d') =>
+      request<DashboardInsights>(`/api/admin/dashboard/insights?period=${period}`),
 
     // ---- Upload de imagem (arquivo do computador) ----
     uploadImage: async (file: File) => {

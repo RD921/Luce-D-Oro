@@ -13,6 +13,7 @@ import {
 } from './db.js';
 import { registerAdminExtras } from './adminExtras.js';
 import { registerSiteContent } from './siteContent.js';
+import { registerAdminCatalog } from './adminCatalog.js';
 import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
@@ -819,6 +820,7 @@ const painel = criarPainel(authMiddleware as any);
 registerAdminExtras(app, painel);
 registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
+registerAdminCatalog(app, painel);
 
 // 1. Admin Dashboard Overview
 app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
@@ -831,6 +833,8 @@ app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest,
     dateFilter = " AND datetime(created_at) >= datetime('now', '-7 days')";
   } else if (period === '30d') {
     dateFilter = " AND datetime(created_at) >= datetime('now', '-30 days')";
+  } else if (period === '90d') {
+    dateFilter = " AND datetime(created_at) >= datetime('now', '-90 days')";
   }
 
   const allOrders = db.prepare(`SELECT * FROM orders WHERE 1=1 ${dateFilter} ORDER BY created_at DESC`).all() as any[];
