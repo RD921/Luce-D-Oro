@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isOwner: boolean;
+  canAdmin: boolean;
   isLoading: boolean;
   authModalOpen: boolean;
   authModalEmail: string;
@@ -117,12 +118,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user && user.role === 'owner' && user.email.toLowerCase() === 'rodrigoarrezzi@icloud.com'
   );
 
+  // Dono ou equipe com algum nível de acesso (o servidor continua sendo quem decide de verdade)
+  const canAdmin = isOwner || Boolean(user?.isStaff);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated,
         isOwner,
+        canAdmin,
         isLoading,
         authModalOpen,
         authModalEmail,

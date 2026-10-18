@@ -113,21 +113,24 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 // ============================================================
 // TABS
 // ============================================================
-type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'settings' | 'audit';
+type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'team' | 'settings' | 'audit';
 
-interface Tab { id: TabId; label: string; icon: React.ReactNode }
+// area = nome da área no servidor; owner = só o proprietário vê
+interface Tab { id: TabId; label: string; icon: React.ReactNode; group: string; area?: string; owner?: boolean }
 
 const TABS: Tab[] = [
-  { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={15} /> },
-  { id: 'products',   label: 'Produtos',     icon: <Package size={15} /> },
-  { id: 'categories', label: 'Categorias',   icon: <Layers size={15} /> },
-  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} /> },
-  { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} /> },
-  { id: 'stock',      label: 'Estoque',      icon: <Archive size={15} /> },
-  { id: 'banners',    label: 'Banners',      icon: <Image size={15} /> },
-  { id: 'coupons',    label: 'Cupons',       icon: <Tag size={15} /> },
-  { id: 'settings',   label: 'Configurações',icon: <Settings size={15} /> },
-  { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} /> },
+  { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={15} />, group: 'Visão Geral', area: 'dashboard' },
+  { id: 'products',   label: 'Produtos',     icon: <Package size={15} />,         group: 'Visão Geral', area: 'produtos' },
+  { id: 'categories', label: 'Categorias',   icon: <Layers size={15} />,          group: 'Visão Geral', area: 'categorias' },
+  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} />,        group: 'Visão Geral', area: 'conteudo' },
+  { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} />,    group: 'Marketing & Loja', area: 'pedidos' },
+  { id: 'stock',      label: 'Estoque',      icon: <Archive size={15} />,         group: 'Marketing & Loja', area: 'estoque' },
+  { id: 'banners',    label: 'Banners',      icon: <Image size={15} />,           group: 'Sistema', area: 'banners' },
+  { id: 'coupons',    label: 'Cupons',       icon: <Tag size={15} />,             group: 'Sistema', area: 'cupons' },
+  { id: 'customers',  label: 'Clientes',     icon: <Users size={15} />,           group: 'Sistema', area: 'clientes' },
+  { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
+  { id: 'settings',   label: 'Configurações',icon: <Settings size={15} />,        group: 'Sistema', owner: true },
+  { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} />,          group: 'Sistema', owner: true },
 ];
 
 // ============================================================
@@ -138,8 +141,10 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
-  const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const { user, logout, isOwner } = useAuth();
+  const abas = TABS.filter(t => (t.owner ? isOwner : isOwner || Boolean(t.area && user?.areas?.[t.area])));
+  const [activeTab, setActiveTab] = useState<TabId>(abas[0]?.id ?? 'dashboard');
+  const grupos = Array.from(new Set(abas.map(t => t.group)));
 
   const handleLogout = async () => {
     await logout();
@@ -151,55 +156,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       {/* -------- Sidebar -------- */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          <span className={styles.sidebarBrandBadge}>⚡ Proprietário</span>
+          <span className={styles.sidebarBrandBadge}>{isOwner ? '⚡ Proprietário' : '👥 Equipe'}</span>
           <span className={styles.sidebarBrandName}>LUCE D'ORO</span>
           <span className={styles.sidebarOwner}>
-            {user?.name || 'Rodrigo Arrezzi'}
+            {user?.name || ''}
           </span>
         </div>
 
         <nav className={styles.sidebarNav}>
-          <div className={styles.navSection}>
-            <div className={styles.navSectionLabel}>Visão Geral</div>
-            {TABS.slice(0, 4).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.navSection}>
-            <div className={styles.navSectionLabel}>Marketing &amp; Loja</div>
-            {TABS.slice(4, 6).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.navSection}>
-            <div className={styles.navSectionLabel}>Sistema</div>
-            {TABS.slice(6).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {grupos.map(g => (
+            <div key={g} className={styles.navSection}>
+              <div className={styles.navSectionLabel}>{g.replace('&', '&amp;')}</div>
+              {abas.filter(t => t.group === g).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ))}
         </nav>
 
         <div className={styles.sidebarFooter}>
@@ -218,7 +197,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       <main className={styles.mainContent}>
         <div className={styles.topBar}>
           <span className={styles.topBarTitle}>
-            {TABS.find(t => t.id === activeTab)?.label}
+            {abas.find(t => t.id === activeTab)?.label}
           </span>
           <div className={styles.topBarRight}>
             <span style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>
@@ -236,8 +215,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'stock'      && <StockTab />}
           {activeTab === 'banners'    && <BannersTab />}
           {activeTab === 'coupons'    && <CouponsTab />}
-          {activeTab === 'settings'   && <SettingsTab />}
-          {activeTab === 'audit'      && <AuditTab />}
+          {activeTab === 'customers'  && <CustomersTab />}
+          {activeTab === 'team'       && isOwner && <TeamTab />}
+          {activeTab === 'settings'   && isOwner && <SettingsTab />}
+          {activeTab === 'audit'      && isOwner && <AuditTab />}
         </div>
       </main>
     </div>
@@ -1475,6 +1456,7 @@ function CouponsTab() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Coupon | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -1502,10 +1484,10 @@ function CouponsTab() {
         {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
           <table>
             <thead>
-              <tr><th>Código</th><th>Tipo</th><th>Desconto</th><th>Gasto mín.</th><th>Usos</th><th>Ativo</th><th>Ações</th></tr>
+              <tr><th>Código</th><th>Tipo</th><th>Desconto</th><th>Gasto mín.</th><th>Usos</th><th>Validade</th><th>Ativo</th><th>Ações</th></tr>
             </thead>
             <tbody>
-              {coupons.length === 0 && <tr><td colSpan={7} className={styles.emptyState}>Nenhum cupom criado.</td></tr>}
+              {coupons.length === 0 && <tr><td colSpan={8} className={styles.emptyState}>Nenhum cupom criado.</td></tr>}
               {coupons.map(c => (
                 <tr key={c.id}>
                   <td><span className={`${styles.tag} ${styles.tagGold}`}>{c.code}</span></td>
@@ -1514,13 +1496,19 @@ function CouponsTab() {
                     {c.discount_type === 'percent' ? `${c.discount_value}%` : fmt(c.discount_value)}
                   </td>
                   <td style={{ fontSize: '0.75rem' }}>{c.min_spend > 0 ? fmt(c.min_spend) : '—'}</td>
-                  <td>{c.usage_count}</td>
+                  <td>{c.usage_count}{c.usage_limit ? ` / ${c.usage_limit}` : ''}</td>
+                  <td style={{ fontSize: '0.75rem' }}>
+                    {c.expires_at ? (c.expires_at < new Date().toISOString().slice(0, 10) ? <span style={{ color: '#E05252' }}>Expirou {c.expires_at.split('-').reverse().join('/')}</span> : c.expires_at.split('-').reverse().join('/')) : '—'}
+                  </td>
                   <td>
                     <span className={`${styles.statusPill} ${c.is_active ? styles.statusConfirmed : styles.statusCancelled}`}>
                       {c.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td>
+                    <button className={styles.btnIcon} onClick={() => setEditing(c)} title="Editar" style={{ marginRight: 4 }}>
+                      <Edit2 size={13} />
+                    </button>
                     <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => handleDelete(c.id, c.code)} title="Excluir">
                       <Trash2 size={13} />
                     </button>
@@ -1532,18 +1520,21 @@ function CouponsTab() {
         )}
       </div>
 
-      {creating && <CouponModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
+      {(creating || editing) && <CouponModal coupon={editing} onClose={() => { setCreating(false); setEditing(null); }} onSaved={() => { setCreating(false); setEditing(null); load(); }} />}
     </>
   );
 }
 
-function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function CouponModal({ coupon, onClose, onSaved }: { coupon: Coupon | null; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    code: '',
-    discount_type: 'percent',
-    discount_value: '',
-    min_spend: '',
-    is_active: true,
+    code: coupon?.code ?? '',
+    discount_type: coupon?.discount_type ?? 'percent',
+    discount_value: coupon ? String(coupon.discount_value) : '',
+    min_spend: coupon && coupon.min_spend ? String(coupon.min_spend) : '',
+    expires_at: coupon?.expires_at ?? '',
+    usage_limit: coupon?.usage_limit ? String(coupon.usage_limit) : '',
+    per_customer_limit: coupon?.per_customer_limit ? String(coupon.per_customer_limit) : '',
+    is_active: coupon ? Boolean(coupon.is_active) : true,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1558,13 +1549,17 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     setSaving(true);
     setError('');
     try {
-      await api.admin.createCoupon({
-        code: form.code.toUpperCase(),
+      const corpo = {
         discount_type: form.discount_type as any,
         discount_value: Number(form.discount_value),
         min_spend: Number(form.min_spend) || 0,
+        expires_at: form.expires_at || null,
+        usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
+        per_customer_limit: form.per_customer_limit ? Number(form.per_customer_limit) : null,
         is_active: form.is_active ? 1 : 0,
-      });
+      };
+      if (coupon) await api.admin.updateCoupon(coupon.id, corpo);
+      else await api.admin.createCoupon({ code: form.code.toUpperCase(), ...corpo });
       onSaved();
     } catch (e: any) { setError(e.message); }
     setSaving(false);
@@ -1574,7 +1569,7 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <span className={styles.modalTitle}>Novo Cupom de Desconto</span>
+          <span className={styles.modalTitle}>{coupon ? `Editar cupom ${coupon.code}` : 'Novo Cupom de Desconto'}</span>
           <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
         </div>
         <div className={styles.modalBody}>
@@ -1582,7 +1577,7 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Código do Cupom *</label>
-              <input className={styles.formInput} value={form.code} onChange={e => set('code', e.target.value.toUpperCase())} placeholder="EX: OURO20" style={{ letterSpacing: '0.1em', fontWeight: 600 }} />
+              <input className={styles.formInput} value={form.code} disabled={Boolean(coupon)} onChange={e => set('code', e.target.value.toUpperCase())} placeholder="EX: OURO20" style={{ letterSpacing: '0.1em', fontWeight: 600 }} />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Tipo de Desconto</label>
@@ -1599,6 +1594,18 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
               <label className={styles.formLabel}>Compra Mínima (R$)</label>
               <input type="number" className={styles.formInput} value={form.min_spend} onChange={e => set('min_spend', e.target.value)} min={0} step={0.01} placeholder="0 = sem mínimo" />
             </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Válido até</label>
+              <input type="date" className={styles.formInput} value={form.expires_at} onChange={e => set('expires_at', e.target.value)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Limite total de usos</label>
+              <input type="number" className={styles.formInput} value={form.usage_limit} onChange={e => set('usage_limit', e.target.value)} min={1} step={1} placeholder="vazio = sem limite" />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Usos por cliente</label>
+              <input type="number" className={styles.formInput} value={form.per_customer_limit} onChange={e => set('per_customer_limit', e.target.value)} min={1} step={1} placeholder="vazio = sem limite" />
+            </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
               <label className={styles.switchLabel}>
                 <input type="checkbox" className={styles.switchInput} checked={form.is_active} onChange={e => set('is_active', e.target.checked)} />
@@ -1610,7 +1617,7 @@ function CouponModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         <div className={styles.modalFooter}>
           <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
           <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={handleSave} disabled={saving}>
-            {saving ? <><div className={styles.spinner} style={{ width: 13, height: 13 }} /> Salvando…</> : 'Criar Cupom'}
+            {saving ? <><div className={styles.spinner} style={{ width: 13, height: 13 }} /> Salvando…</> : coupon ? 'Salvar alterações' : 'Criar Cupom'}
           </button>
         </div>
       </div>
@@ -1701,36 +1708,16 @@ function SettingsTab() {
 function AuditTab() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [view, setView] = useState<'logs' | 'customers'>('logs');
 
   useEffect(() => {
-    Promise.all([api.admin.getAuditLogs(), api.admin.getCustomers()])
-      .then(([l, c]) => { setLogs(l); setCustomers(c); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    api.admin.getAuditLogs().then(setLogs).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   return (
     <>
-      <div className={styles.filterRow}>
-        <button
-          className={`${styles.btnSmall} ${view === 'logs' ? styles.btnSmallPrimary : styles.btnSmallGhost}`}
-          onClick={() => setView('logs')}
-        >
-          <Shield size={12} /> Log de Auditoria
-        </button>
-        <button
-          className={`${styles.btnSmall} ${view === 'customers' ? styles.btnSmallPrimary : styles.btnSmallGhost}`}
-          onClick={() => setView('customers')}
-        >
-          <Users size={12} /> Clientes ({customers.length})
-        </button>
-      </div>
-
       {loading ? (
         <div className={styles.loader}><div className={styles.spinner}/></div>
-      ) : view === 'logs' ? (
+      ) : (
         <div className={styles.tableWrapper}>
           <div style={{ padding: '1rem', maxHeight: 600, overflowY: 'auto' }}>
             {logs.length === 0 && <div className={styles.emptyState}>Nenhum evento registrado.</div>}
@@ -1759,25 +1746,164 @@ function AuditTab() {
             ))}
           </div>
         </div>
-      ) : (
+      )}
+    </>
+  );
+}
+
+// ============================================================
+// TAB: CLIENTES (lista + ficha)
+// ============================================================
+function CustomersTab() {
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busca, setBusca] = useState('');
+  const [ficha, setFicha] = useState<{ cliente: any; resumo: { pedidos: number; gasto: number }; pedidos: any[] } | null>(null);
+
+  useEffect(() => {
+    api.admin.getCustomers().then(setCustomers).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const abrir = async (id: number) => {
+    try { setFicha(await api.admin.getCustomer(id)); } catch (e: any) { alert(e.message); }
+  };
+
+  const q = busca.trim().toLowerCase();
+  const lista = q ? customers.filter(c => `${c.name} ${c.email}`.toLowerCase().includes(q)) : customers;
+
+  return (
+    <>
+      <div className={styles.filterRow}>
+        <input className={styles.formInput} style={{ maxWidth: 320 }} placeholder="Buscar por nome ou e-mail…" value={busca} onChange={e => setBusca(e.target.value)} />
+        <span style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>{lista.length} cliente(s)</span>
+      </div>
+      {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
         <div className={styles.tableWrapper}>
           <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Pedidos</th><th>Gasto Total</th><th>Desde</th></tr></thead>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Pedidos</th><th>Gasto Total</th><th>Desde</th><th></th></tr></thead>
             <tbody>
-              {customers.length === 0 && <tr><td colSpan={5} className={styles.emptyState}>Nenhum cliente cadastrado.</td></tr>}
-              {customers.map((c: any) => (
+              {lista.length === 0 && <tr><td colSpan={6} className={styles.emptyState}>Nenhum cliente encontrado.</td></tr>}
+              {lista.map((c: any) => (
                 <tr key={c.id}>
                   <td className={styles.productName}>{c.name}</td>
                   <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>{c.email}</td>
-                  <td>{c.total_orders || 0}</td>
+                  <td>{c.orders_count || 0}</td>
                   <td className={styles.price}>{fmt(c.total_spent || 0)}</td>
                   <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>{fmtDate(c.created_at)}</td>
+                  <td><button className={styles.btnIcon} onClick={() => abrir(c.id)} title="Ver ficha"><Eye size={13} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {ficha && (
+        <div className={styles.modalOverlay} onClick={() => setFicha(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>{ficha.cliente.name}</span>
+              <button className={styles.modalCloseBtn} onClick={() => setFicha(null)}><X size={16} /></button>
+            </div>
+            <div className={styles.modalBody}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--adm-text-muted)', marginBottom: '1rem' }}>
+                {ficha.cliente.email} · cliente desde {fmtDate(ficha.cliente.created_at)}
+              </div>
+              <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem' }}>
+                <div><div style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>Pedidos</div><strong>{ficha.resumo.pedidos}</strong></div>
+                <div><div style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>Total gasto</div><strong>{fmt(ficha.resumo.gasto)}</strong></div>
+              </div>
+              <table>
+                <thead><tr><th>Pedido</th><th>Data</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody>
+                  {ficha.pedidos.length === 0 && <tr><td colSpan={4} className={styles.emptyState}>Ainda sem pedidos.</td></tr>}
+                  {ficha.pedidos.map((p: any) => (
+                    <tr key={p.id}>
+                      <td style={{ fontSize: '0.75rem' }}>{p.id}</td>
+                      <td style={{ fontSize: '0.75rem' }}>{fmtDate(p.created_at)}</td>
+                      <td style={{ fontSize: '0.75rem' }}>{p.status}</td>
+                      <td className={styles.price}>{fmt(p.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================
+// TAB: EQUIPE (somente proprietário)
+// ============================================================
+function TeamTab() {
+  const [dados, setDados] = useState<Awaited<ReturnType<typeof api.admin.getTeam>> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [papel, setPapel] = useState('atendente');
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  const load = async () => {
+    try { setDados(await api.admin.getTeam()); } catch {/* */}
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const rodar = async (fn: () => Promise<{ message: string }>) => {
+    try { const r = await fn(); setMsg({ ok: true, texto: r.message }); await load(); }
+    catch (e: any) { setMsg({ ok: false, texto: e.message }); }
+  };
+
+  if (loading) return <div className={styles.loader}><div className={styles.spinner}/></div>;
+  const papeis = dados?.papeis ?? [];
+
+  return (
+    <>
+      <div className={styles.sectionHeader}><span className={styles.sectionTitle}>Equipe e níveis de acesso</span></div>
+      {msg && <div className={`${styles.alertRow} ${msg.ok ? '' : styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{msg.texto}</div></div>}
+
+      <div className={styles.tableWrapper} style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
+        <div style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>Adicionar pessoa à equipe (ela precisa já ter conta na loja)</div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <input className={styles.formInput} style={{ flex: '1 1 240px' }} type="email" placeholder="e-mail da pessoa" value={email} onChange={e => setEmail(e.target.value)} />
+          <select className={styles.formInput} style={{ width: 170 }} value={papel} onChange={e => setPapel(e.target.value)}>
+            {papeis.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={!email.trim()} onClick={() => rodar(async () => { const r = await api.admin.addTeamMember(email, papel); setEmail(''); return r; })}>
+            <Plus size={13} /> Adicionar
+          </button>
+        </div>
+        <ul style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)', marginTop: '0.75rem', paddingLeft: '1.1rem' }}>
+          {papeis.map(p => <li key={p.id}><strong>{p.label}:</strong> {p.descricao}</li>)}
+        </ul>
+      </div>
+
+      <div className={styles.tableWrapper}>
+        <table>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th></th></tr></thead>
+          <tbody>
+            {(dados?.membros.length ?? 0) === 0 && <tr><td colSpan={4} className={styles.emptyState}>Ninguém na equipe ainda.</td></tr>}
+            {dados?.membros.map(m => (
+              <tr key={m.id}>
+                <td className={styles.productName}>{m.name}</td>
+                <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>{m.email}</td>
+                <td>
+                  <select className={styles.formInput} value={m.role} onChange={e => rodar(() => api.admin.setTeamRole(m.id, e.target.value))}>
+                    {papeis.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} title="Remover da equipe" onClick={() => { if (confirm(`Remover ${m.name} da equipe? Ela volta a ser cliente.`)) void rodar(() => api.admin.removeTeamMember(m.id)); }}>
+                    <Trash2 size={13} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

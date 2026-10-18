@@ -13,6 +13,7 @@ import {
 } from './db.js';
 import { registerAdminExtras } from './adminExtras.js';
 import { registerSiteContent } from './siteContent.js';
+import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
 
@@ -281,6 +282,8 @@ app.get('/api/auth/me', authMiddleware, (req: AuthenticatedRequest, res: Respons
       role: user.role,
       isVerified: Boolean(user.is_verified),
       isOwner: user.role === 'owner' && user.email.toLowerCase() === AUTHORIZED_OWNER.email.toLowerCase(),
+      isStaff: Object.keys(areasDoPapel(user.role)).length > 0,
+      areas: areasDoPapel(user.role),
       createdAt: user.created_at,
     },
   });
@@ -492,21 +495,20 @@ app.post('/api/coupons/validate', (req: Request, res: Response) => {
     return;
   }
 
-  const coupon = db
-    .prepare('SELECT * FROM coupons WHERE code = ? AND is_active = 1')
-    .get(code.trim().toUpperCase()) as
-    | { id: string; code: string; discount_type: string; discount_value: number; min_spend: number }
-    | undefined;
-
+  const coupon = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(code).trim().toUpperCase()) as any;
   if (!coupon) {
     res.status(404).json({ error: 'Cupom inválido ou inativo.' });
     return;
   }
-
-  if (cartTotal < coupon.min_spend) {
-    res.status(400).json({
-      error: `Este cupom exige valor mínimo de R$ ${coupon.min_spend.toFixed(2)} em compras.`,
-    });
+  const quemPede = (() => {
+    const t = (req as any).cookies?.session_token || req.headers.authorization?.replace('Bearer ', '');
+    if (!t) return null;
+    const r = db.prepare('SELECT user_id FROM sessions WHERE token = ? AND expires_at > ?').get(t, new Date().toISOString()) as { user_id: number } | undefined;
+    return r ? r.user_id : null;
+  })();
+  const motivo = motivoCupomInvalido(coupon, quemPede, Number(cartTotal) || 0);
+  if (motivo) {
+    res.status(400).json({ error: motivo });
     return;
   }
 
@@ -750,18 +752,17 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 
   let subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
   let discount = 0;
+  let cupomUsado: string | null = null;
 
   if (couponCode) {
-    const coupon = db
-      .prepare('SELECT * FROM coupons WHERE code = ? AND is_active = 1')
-      .get(couponCode.trim().toUpperCase()) as any;
-    if (coupon && subtotal >= coupon.min_spend) {
+    const coupon = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(couponCode).trim().toUpperCase()) as any;
+    if (coupon && !motivoCupomInvalido(coupon, userId, subtotal)) {
       if (coupon.discount_type === 'percent') {
         discount = (subtotal * coupon.discount_value) / 100;
       } else {
         discount = Math.min(coupon.discount_value, subtotal);
       }
-      db.prepare('UPDATE coupons SET usage_count = usage_count + 1 WHERE id = ?').run(coupon.id);
+      cupomUsado = coupon.id;
     }
   }
 
@@ -771,6 +772,7 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
   db.prepare(
     'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(orderId, userId, total, 'Confirmado', shippingAddress, paymentMethod);
+  if (cupomUsado) registrarUsoCupom(cupomUsado, userId, orderId);
 
   const insertOrderItem = db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name, variant_title, unit_price, quantity, image_url)
@@ -813,11 +815,13 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 // ==================== ADMIN EXCLUSIVE ROUTES (OWNER ONLY) ====================
 
 // Upload de imagens e categorias (arquivo separado)
-registerAdminExtras(app, ownerAuthMiddleware);
-registerSiteContent(app, ownerAuthMiddleware);
+const painel = criarPainel(authMiddleware as any);
+registerAdminExtras(app, painel);
+registerSiteContent(app, painel);
+registerAdminTeam(app, painel, ownerAuthMiddleware as any);
 
 // 1. Admin Dashboard Overview
-app.get('/api/admin/dashboard', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
   const { period = 'all' } = req.query;
 
   let dateFilter = '';
@@ -915,7 +919,7 @@ app.get('/api/admin/dashboard', ownerAuthMiddleware, (req: AuthenticatedRequest,
 });
 
 // 2. Admin Products CRUD
-app.get('/api/admin/products', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/products', painel('produtos'), (_req: AuthenticatedRequest, res: Response) => {
   const rows = db.prepare('SELECT * FROM products ORDER BY created_at DESC').all() as any[];
   const products = rows.map((r) => ({
     ...r,
@@ -925,7 +929,7 @@ app.get('/api/admin/products', ownerAuthMiddleware, (_req: AuthenticatedRequest,
   res.json(products);
 });
 
-app.post('/api/admin/products', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.post('/api/admin/products', painel('produtos'), (req: AuthenticatedRequest, res: Response) => {
   const {
     name,
     category_id,
@@ -1008,7 +1012,7 @@ app.post('/api/admin/products', ownerAuthMiddleware, (req: AuthenticatedRequest,
   res.status(201).json({ success: true, id, message: 'Produto cadastrado com sucesso.' });
 });
 
-app.put('/api/admin/products/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.put('/api/admin/products/:id', painel('produtos'), (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as any;
   if (!existing) {
@@ -1097,7 +1101,7 @@ app.put('/api/admin/products/:id', ownerAuthMiddleware, (req: AuthenticatedReque
   res.json({ success: true, message: 'Produto atualizado com sucesso.' });
 });
 
-app.delete('/api/admin/products/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.delete('/api/admin/products/:id', painel('produtos'), (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   const existing = db.prepare('SELECT id, name FROM products WHERE id = ?').get(id) as any;
   if (!existing) {
@@ -1121,7 +1125,7 @@ app.delete('/api/admin/products/:id', ownerAuthMiddleware, (req: AuthenticatedRe
 });
 
 // 3. Admin Orders Management
-app.get('/api/admin/orders', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/orders', painel('pedidos'), (req: AuthenticatedRequest, res: Response) => {
   const { status, q } = req.query;
 
   let query = `
@@ -1154,7 +1158,7 @@ app.get('/api/admin/orders', ownerAuthMiddleware, (req: AuthenticatedRequest, re
   res.json(detailed);
 });
 
-app.put('/api/admin/orders/:id/status', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.put('/api/admin/orders/:id/status', painel('pedidos'), (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   const { status, trackingCode, internalNotes } = req.body;
 
@@ -1185,7 +1189,7 @@ app.put('/api/admin/orders/:id/status', ownerAuthMiddleware, (req: Authenticated
 });
 
 // 4. Admin Stock Adjustments
-app.get('/api/admin/stock', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/stock', painel('estoque'), (_req: AuthenticatedRequest, res: Response) => {
   const products = db
     .prepare('SELECT id, name, category_id, stock, price, cost_price, image_primary FROM products WHERE is_archived = 0 ORDER BY stock ASC')
     .all();
@@ -1206,7 +1210,7 @@ app.get('/api/admin/stock', ownerAuthMiddleware, (_req: AuthenticatedRequest, re
   res.json({ products, movements });
 });
 
-app.post('/api/admin/stock/adjust', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.post('/api/admin/stock/adjust', painel('estoque'), (req: AuthenticatedRequest, res: Response) => {
   const { productId, quantityChange, reason } = req.body;
 
   if (!productId || quantityChange === undefined || !reason) {
@@ -1248,12 +1252,12 @@ app.post('/api/admin/stock/adjust', ownerAuthMiddleware, (req: AuthenticatedRequ
 });
 
 // 5. Admin Banners
-app.get('/api/admin/banners', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/banners', painel('banners'), (_req: AuthenticatedRequest, res: Response) => {
   const banners = db.prepare('SELECT * FROM banners ORDER BY display_order ASC, created_at DESC').all();
   res.json(banners);
 });
 
-app.post('/api/admin/banners', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.post('/api/admin/banners', painel('banners'), (req: AuthenticatedRequest, res: Response) => {
   const { title, subtitle, badge, cta_text, cta_link, image_desktop, is_active = 1, display_order = 0 } = req.body;
 
   if (!title || !image_desktop) {
@@ -1279,7 +1283,7 @@ app.post('/api/admin/banners', ownerAuthMiddleware, (req: AuthenticatedRequest, 
   res.status(201).json({ success: true, id, message: 'Banner criado com sucesso.' });
 });
 
-app.put('/api/admin/banners/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.put('/api/admin/banners/:id', painel('banners'), (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   const { title, subtitle, badge, cta_text, cta_link, image_desktop, is_active, display_order } = req.body;
 
@@ -1318,7 +1322,7 @@ app.put('/api/admin/banners/:id', ownerAuthMiddleware, (req: AuthenticatedReques
   res.json({ success: true, message: 'Banner atualizado.' });
 });
 
-app.delete('/api/admin/banners/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.delete('/api/admin/banners/:id', painel('banners'), (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   db.prepare('DELETE FROM banners WHERE id = ?').run(id);
 
@@ -1366,73 +1370,8 @@ app.put('/api/admin/settings', ownerAuthMiddleware, (req: AuthenticatedRequest, 
   res.json({ success: true, message: 'Configurações da loja atualizadas com sucesso.' });
 });
 
-// 7. Admin Coupons CRUD
-app.get('/api/admin/coupons', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
-  const coupons = db.prepare('SELECT * FROM coupons ORDER BY created_at DESC').all();
-  res.json(coupons);
-});
-
-app.post('/api/admin/coupons', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
-  const { code, discount_type, discount_value, min_spend = 0, is_active = 1 } = req.body;
-
-  if (!code || !discount_type || discount_value === undefined) {
-    res.status(400).json({ error: 'Código, tipo de desconto e valor são obrigatórios.' });
-    return;
-  }
-
-  const cleanCode = code.trim().toUpperCase();
-  const existing = db.prepare('SELECT id FROM coupons WHERE code = ?').get(cleanCode);
-  if (existing) {
-    res.status(409).json({ error: 'Já existe um cupom cadastrado com este código.' });
-    return;
-  }
-
-  const id = `cp_${cleanCode.toLowerCase()}_${Date.now().toString(36)}`;
-  db.prepare(`
-    INSERT INTO coupons (id, code, discount_type, discount_value, min_spend, is_active, usage_count)
-    VALUES (?, ?, ?, ?, ?, ?, 0)
-  `).run(id, cleanCode, discount_type, parseFloat(discount_value), parseFloat(min_spend || 0), is_active ? 1 : 0);
-
-  logAudit({
-    userId: req.user!.id,
-    userEmail: req.user!.email,
-    action: 'COUPON_CREATED',
-    entity: 'COUPONS',
-    entityId: id,
-    details: { code: cleanCode, discount_type, discount_value },
-  });
-
-  res.status(201).json({ success: true, id, message: 'Cupom criado com sucesso.' });
-});
-
-app.put('/api/admin/coupons/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
-  const id = String(req.params.id);
-  const { is_active, discount_value, min_spend } = req.body;
-
-  db.prepare(`
-    UPDATE coupons SET
-      is_active = COALESCE(?, is_active),
-      discount_value = COALESCE(?, discount_value),
-      min_spend = COALESCE(?, min_spend)
-    WHERE id = ?
-  `).run(
-    is_active !== undefined ? (is_active ? 1 : 0) : null,
-    discount_value !== undefined ? parseFloat(discount_value) : null,
-    min_spend !== undefined ? parseFloat(min_spend) : null,
-    id
-  );
-
-  res.json({ success: true, message: 'Cupom atualizado.' });
-});
-
-app.delete('/api/admin/coupons/:id', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
-  const id = String(req.params.id);
-  db.prepare('DELETE FROM coupons WHERE id = ?').run(id);
-  res.json({ success: true, message: 'Cupom removido.' });
-});
-
 // 8. Admin Customers
-app.get('/api/admin/customers', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/customers', painel('clientes'), (_req: AuthenticatedRequest, res: Response) => {
   const customers = db
     .prepare(
       `
@@ -1462,7 +1401,7 @@ app.get('/api/admin/audit-logs', ownerAuthMiddleware, (_req: AuthenticatedReques
 });
 
 // 10. Admin Real-time Alerts
-app.get('/api/admin/alerts', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/alerts', painel('dashboard'), (_req: AuthenticatedRequest, res: Response) => {
   const alerts: Array<{ id: string; type: 'warning' | 'info' | 'danger'; title: string; message: string; link?: string }> = [];
 
   // Low stock alerts

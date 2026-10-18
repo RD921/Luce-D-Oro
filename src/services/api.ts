@@ -7,6 +7,8 @@ export interface User {
   role: 'owner' | 'customer' | string;
   isVerified?: boolean;
   isOwner?: boolean;
+  isStaff?: boolean;
+  areas?: Record<string, 'r' | 'rw'>;
   createdAt?: string;
 }
 
@@ -110,6 +112,9 @@ export interface Coupon {
   min_spend: number;
   is_active: number;
   usage_count: number;
+  expires_at?: string | null;
+  usage_limit?: number | null;
+  per_customer_limit?: number | null;
   created_at: string;
 }
 
@@ -419,6 +424,22 @@ export const api = {
       }),
 
     getCustomers: () => request<any[]>('/api/admin/customers'),
+
+    getCustomer: (id: number) =>
+      request<{ cliente: any; resumo: { pedidos: number; gasto: number }; pedidos: any[] }>(`/api/admin/customers/${id}`),
+
+    // ---- Equipe (somente proprietário) ----
+    getTeam: () =>
+      request<{
+        membros: Array<{ id: number; name: string; email: string; role: string; created_at: string }>;
+        papeis: Array<{ id: string; label: string; descricao: string; areas: Record<string, string> }>;
+      }>('/api/admin/team'),
+    addTeamMember: (email: string, role: string) =>
+      request<{ success: boolean; message: string }>('/api/admin/team', { method: 'POST', body: JSON.stringify({ email, role }) }),
+    setTeamRole: (id: number, role: string) =>
+      request<{ success: boolean; message: string }>(`/api/admin/team/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    removeTeamMember: (id: number) =>
+      request<{ success: boolean; message: string }>(`/api/admin/team/${id}`, { method: 'DELETE' }),
 
     // ---- Conteúdo da loja (textos e imagens) ----
     getContent: () =>

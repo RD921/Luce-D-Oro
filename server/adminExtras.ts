@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db, logAudit } from './db.js';
+import type { Area } from './adminTeam.js';
 
 type Owner = { id: number; email: string };
 const dono = (req: Request): Owner => (req as unknown as { user: Owner }).user;
@@ -44,7 +45,7 @@ export function migrarExtras() {
   }
 }
 
-export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
+export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHandler) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   migrarExtras();
 
@@ -53,7 +54,7 @@ export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
 
   // ---------- Upload de imagem ----------
   // Corpo: { data: "<base64 ou data:image/...;base64,...>" }
-  app.post('/api/admin/uploads', express.json({ limit: '10mb' }), ownerAuth, (req: Request, res: Response) => {
+  app.post('/api/admin/uploads', express.json({ limit: '10mb' }), painel('uploads'), (req: Request, res: Response) => {
     const bruto = String(req.body?.data || '');
     if (!bruto) { res.status(400).json({ error: 'Nenhuma imagem enviada.' }); return; }
     const base64 = bruto.includes(',') ? bruto.slice(bruto.indexOf(',') + 1) : bruto;
@@ -72,7 +73,7 @@ export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
   });
 
   // ---------- Categorias ----------
-  app.get('/api/admin/categories', ownerAuth, (_req: Request, res: Response) => {
+  app.get('/api/admin/categories', painel('categorias'), (_req: Request, res: Response) => {
     const lista = db
       .prepare(
         `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_archived = 0) AS product_count
@@ -82,7 +83,7 @@ export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
     res.json(lista);
   });
 
-  app.post('/api/admin/categories', ownerAuth, (req: Request, res: Response) => {
+  app.post('/api/admin/categories', painel('categorias'), (req: Request, res: Response) => {
     const { name, description = '', image_url = '', display_order, is_active = 1 } = req.body || {};
     const nome = String(name || '').trim();
     if (!nome) { res.status(400).json({ error: 'O nome da categoria é obrigatório.' }); return; }
@@ -103,7 +104,7 @@ export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
     res.status(201).json({ success: true, id: slug, message: 'Categoria criada.' });
   });
 
-  app.put('/api/admin/categories/:id', ownerAuth, (req: Request, res: Response) => {
+  app.put('/api/admin/categories/:id', painel('categorias'), (req: Request, res: Response) => {
     const id = String(req.params.id);
     const atual = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     if (!atual) { res.status(404).json({ error: 'Categoria não encontrada.' }); return; }
@@ -124,7 +125,7 @@ export function registerAdminExtras(app: Express, ownerAuth: RequestHandler) {
     res.json({ success: true, message: 'Categoria atualizada.' });
   });
 
-  app.delete('/api/admin/categories/:id', ownerAuth, (req: Request, res: Response) => {
+  app.delete('/api/admin/categories/:id', painel('categorias'), (req: Request, res: Response) => {
     const id = String(req.params.id);
     const atual = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id) as { id: string; name: string } | undefined;
     if (!atual) { res.status(404).json({ error: 'Categoria não encontrada.' }); return; }

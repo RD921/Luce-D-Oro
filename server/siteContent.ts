@@ -18,7 +18,7 @@ function imagemValida(v: string): boolean {
   return /^\/(images|uploads)\/[\w./-]+$/.test(v) || /^https:\/\/[^\s"'<>]+$/.test(v);
 }
 
-export function registerSiteContent(app: Express, ownerAuth: RequestHandler) {
+export function registerSiteContent(app: Express, painel: (a: 'conteudo') => RequestHandler) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS site_content (
       key TEXT PRIMARY KEY,
@@ -33,7 +33,7 @@ export function registerSiteContent(app: Express, ownerAuth: RequestHandler) {
   });
 
   // Painel: lista de campos com valor atual e padrão
-  app.get('/api/admin/content', ownerAuth, (_req: Request, res: Response) => {
+  app.get('/api/admin/content', painel('conteudo'), (_req: Request, res: Response) => {
     const custom = lerPersonalizados();
     res.json(
       CONTENT_FIELDS.map((f) => ({ ...f, value: custom[f.key] ?? f.def, customized: f.key in custom }))
@@ -41,7 +41,7 @@ export function registerSiteContent(app: Express, ownerAuth: RequestHandler) {
   });
 
   // Painel: salva só o que mudou. Valor vazio = volta ao padrão.
-  app.put('/api/admin/content', ownerAuth, (req: Request, res: Response) => {
+  app.put('/api/admin/content', painel('conteudo'), (req: Request, res: Response) => {
     const valores = req.body?.values;
     if (!valores || typeof valores !== 'object' || Array.isArray(valores)) {
       res.status(400).json({ error: 'Envie os campos em "values".' });

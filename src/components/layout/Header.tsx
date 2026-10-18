@@ -12,7 +12,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenAdmin }) => {
-  const { user, isAuthenticated, isOwner, openAuthModal, logout, setOrdersModalOpen } = useAuth();
+  const { user, isAuthenticated, canAdmin, openAuthModal, logout, setOrdersModalOpen } = useAuth();
   const { cart, openCartDrawer } = useCart();
   const { categories } = useSite();
 
@@ -122,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
                   </div>
                   <div className={styles.dropdownDivider} />
                   {/* EXCLUSIVE: Admin Panel only for Rodrigo Arrezzi (isOwner === true) */}
-                  {isOwner && onOpenAdmin && (
+                  {canAdmin && onOpenAdmin && (
                     <>
                       <button
                         className={styles.dropdownItem}

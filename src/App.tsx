@@ -22,7 +22,7 @@ function AppContent() {
   const [adminOpen, setAdminOpen] = useState(false);
 
   const { setCheckoutModalOpen } = useCart();
-  const { isOwner, setOrdersModalOpen } = useAuth();
+  const { canAdmin, setOrdersModalOpen } = useAuth();
   const { categories, categoriesLoaded } = useSite();
   const primeiraCategoria = categories[0]?.slug || 'pulseiras';
 
@@ -108,7 +108,7 @@ function AppContent() {
       />
 
       {/* EXCLUSIVE OWNER ADMIN PANEL — Only rendered for Rodrigo Arrezzi */}
-      {isOwner && adminOpen && (
+      {canAdmin && adminOpen && (
         <AdminPanel onClose={() => setAdminOpen(false)} />
       )}
     </div>
