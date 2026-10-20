@@ -4,8 +4,8 @@
   left: 0;
   width: 100%;
   height: var(--header-height);
-  background-color: var(--bg-primary);
-  border-bottom: 1px solid var(--border-subtle);
+  background-color: #f4efe7;
+  border-bottom: none;
   z-index: 100;
   transition: all var(--transition-base);
 }
@@ -39,9 +39,9 @@
 
 .navLink {
   font-family: var(--font-sans);
-  font-size: 0.875rem;
+  font-size: 0.68rem;
   font-weight: 400;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--text-secondary);
   position: relative;
@@ -106,9 +106,9 @@
 }
 
 .brandLogoImg {
-  height: 58px;
+  height: 72px;
   width: auto;
-  max-width: 140px;
+  max-width: 180px;
   object-fit: contain;
   display: block;
 }

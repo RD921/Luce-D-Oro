@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, ShieldCheck, Sparkles, Award, Truck, RefreshCw, Gem, Clock } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Sparkles, Truck, Gem } from 'lucide-react';
 import { api, type Product } from '../../services/api';
 import { ProductCard } from '../catalog/ProductCard';
 import { useSite } from '../../context/SiteContext';
@@ -39,84 +39,82 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
 
   return (
     <div className={styles.homeContainer}>
-      {/* SEÇÃO 1: HERO PRINCIPAL EDITORIAL */}
-      <section className={styles.heroSection}>
+      {/* HERO EDITORIAL: foto em largura total, texto à esquerda */}
+      <section className={styles.heroSection} style={{ backgroundImage: `url(${hero.image})` }}>
+        <div className={styles.heroShade} />
         <div className="container">
-          <div className={styles.heroGrid}>
-            <div className={styles.heroContent}>
-              <div className={styles.heroPill}>
-                <Sparkles size={13} color="#B89758" />
-                <span>{hero.pill}</span>
-              </div>
+          <div className={styles.heroContent}>
+            <span className={styles.eyebrow}>{hero.pill}</span>
+            <h1 className={styles.heroTitle}>{hero.title}</h1>
+            <p className={styles.heroSubtitle}>{hero.subtitle}</p>
+            <button onClick={handleHeroCta} className={styles.linkCta} id="hero-cta-btn">
+              <span>{hero.cta}</span>
+              <ArrowRight size={16} strokeWidth={1.2} />
+            </button>
+          </div>
+        </div>
+      </section>
 
-              <h1 className={styles.heroTitle}>
-                {hero.title}
-              </h1>
-
-              <p className={styles.heroSubtitle}>
-                {hero.subtitle}
-              </p>
-
-              <div className={styles.heroCtaRow}>
-                <button
-                  onClick={handleHeroCta}
-                  className={`btn-primary ${styles.heroCta}`}
-                  id="hero-cta-btn"
-                >
-                  <span>{hero.cta}</span>
-                  <ArrowRight size={16} />
-                </button>
-              </div>
+      {/* PROCESSO / MATERIAIS */}
+      <section className={styles.processSection}>
+        <div className="container">
+          <div className={styles.processGrid}>
+            <div className={styles.processText}>
+              <span className={styles.eyebrow}>{c('materials_tag')}</span>
+              <h2 className={styles.processTitle}>{c('materials_title')}</h2>
+              <p className={styles.processLead}>{c('materials_lead')}</p>
+              <button onClick={() => onNavigateCategory(categories[0]?.slug || 'pulseiras')} className={styles.linkCta}>
+                <span>Ver coleções</span>
+                <ArrowRight size={16} strokeWidth={1.2} />
+              </button>
             </div>
-
-            <div className={styles.heroVisualCol}>
-              <div className={styles.heroImageWrapper}>
-                <img
-                  src={hero.image}
-                  alt="Luce D'Oro Joalheria Contemporânea"
-                  className={styles.heroBrandImage}
-                />
-              </div>
+            <div className={styles.processImage}>
+              <img src={c('materials_image')} alt="Ourivesaria artesanal" />
+              <span className={styles.processCaption}>{c('materials_pill')}</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* SEÇÃO 2: CATEGORIAS EM DESTAQUE */}
-      <section className={styles.categoriesSection}>
+      {/* FAIXA DE CONFIANÇA */}
+      <section className={styles.trustStrip}>
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionCategoryTag}>{c('collections_tag')}</span>
-            <h2 className={styles.sectionTitle}>{c('collections_title')}</h2>
-            <div className={styles.goldDivider} />
-          </div>
-
-          <div className={styles.categoriesGrid}>
-            {categories.map((cat) => (
-              <div
-                key={cat.id}
-                className={styles.categoryCard}
-                onClick={() => onNavigateCategory(cat.slug)}
-                role="button"
-                tabIndex={0}
-              >
-                <div className={styles.categoryImageWrapper}>
-                  <img
-                    src={cat.image_url || '/images/hero-editorial.jpg'}
-                    alt={`Coleção de ${cat.name} em Ouro 18k`}
-                    className={styles.categoryImage}
-                  />
-                  <div className={styles.categoryCardOverlay} />
-                </div>
-                <div className={styles.categoryInfo}>
-                  <span className={styles.categorySub}>EXPLORAR</span>
-                  <h3 className={styles.categoryTitle}>{cat.name}</h3>
-                  <span className={styles.categoryLink}>
-                    <span>Ver coleção</span>
-                    <ArrowRight size={14} />
-                  </span>
-                </div>
+          <div className={styles.trustRow}>
+            {[
+              { Icon: Gem, t: 'trust1_title', d: 'trust1_desc' },
+              { Icon: ShieldCheck, t: 'trust2_title', d: 'trust2_desc' },
+              { Icon: Truck, t: 'trust3_title', d: 'trust3_desc' },
+              { Icon: Sparkles, t: 'trust4_title', d: 'trust4_desc' },
+            ].map(({ Icon, t, d }) => (
+              <div key={t} className={styles.trustCell}>
+                <Icon size={22} strokeWidth={1.2} />
+                <h3>{c(t)}</h3>
+                <p>{c(d)}</p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* COLEÇÕES */}
+      <section className={styles.collectionsSection}>
+        <div className="container">
+          <div className={styles.collectionsHead}>
+            <div>
+              <span className={styles.eyebrow}>{c('collections_tag')}</span>
+              <h2 className={styles.collectionsTitle}>{c('collections_title')}</h2>
+            </div>
+          </div>
+          <div className={styles.collectionsGrid}>
+            {categories.map((cat) => (
+              <button key={cat.id} className={styles.collectionCard} onClick={() => onNavigateCategory(cat.slug)}>
+                <img src={cat.image_url || '/images/hero-editorial.jpg'} alt={cat.name} />
+                <span className={styles.collectionShade} />
+                <span className={styles.collectionInfo}>
+                  <span className={styles.collectionName}>{cat.name}</span>
+                  <span className={styles.collectionLink}>Conferir produto <ArrowRight size={13} strokeWidth={1.2} /></span>
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -145,67 +143,6 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
         </div>
       </section>
 
-      {/* SEÇÃO 4: QUALIDADE DOS MATERIAIS */}
-      <section className={styles.materialsSection}>
-        <div className="container">
-          <div className={styles.materialsGrid}>
-            <div className={styles.materialsImageCol}>
-              <div className={styles.materialsImageWrapper}>
-                <img
-                  src={c('materials_image')}
-                  alt="Detalhe macro de fecho gaveta em ouro 18k e ourivesaria artesanal"
-                  className={styles.materialsImage}
-                />
-                <div className={styles.materialsPill}>
-                  <Award size={14} color="#B89758" />
-                  <span>{c('materials_pill')}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.materialsTextCol}>
-              <span className={styles.sectionCategoryTag}>{c('materials_tag')}</span>
-              <h2 className={styles.materialsTitle}>{c('materials_title')}</h2>
-              <p className={styles.materialsLead}>
-                {c('materials_lead')}
-              </p>
-
-              <div className={styles.specsList}>
-                <div className={styles.specItem}>
-                  <div className={styles.specIcon}>
-                    <Gem size={18} color="#B89758" />
-                  </div>
-                  <div>
-                    <h4 className={styles.specTitle}>{c('spec1_title')}</h4>
-                    <p className={styles.specDesc}>{c('spec1_desc')}</p>
-                  </div>
-                </div>
-
-                <div className={styles.specItem}>
-                  <div className={styles.specIcon}>
-                    <ShieldCheck size={18} color="#B89758" />
-                  </div>
-                  <div>
-                    <h4 className={styles.specTitle}>{c('spec2_title')}</h4>
-                    <p className={styles.specDesc}>{c('spec2_desc')}</p>
-                  </div>
-                </div>
-
-                <div className={styles.specItem}>
-                  <div className={styles.specIcon}>
-                    <Clock size={18} color="#B89758" />
-                  </div>
-                  <div>
-                    <h4 className={styles.specTitle}>{c('spec3_title')}</h4>
-                    <p className={styles.specDesc}>{c('spec3_desc')}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* SEÇÃO 5: HISTÓRIA DA MARCA */}
       <section className={styles.brandStorySection}>
         <div className="container">
@@ -226,52 +163,6 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
         </div>
       </section>
 
-      {/* SEÇÃO 6: CONFIANÇA E ATENDIMENTO CONCIERGE */}
-      <section className={styles.trustSection}>
-        <div className="container">
-          <div className={styles.trustGrid}>
-            <div className={styles.trustItem}>
-              <div className={styles.trustIconCircle}>
-                <Truck size={24} color="#B89758" />
-              </div>
-              <h3 className={styles.trustTitle}>{c('trust1_title')}</h3>
-              <p className={styles.trustDesc}>
-                {c('trust1_desc')}
-              </p>
-            </div>
-
-            <div className={styles.trustItem}>
-              <div className={styles.trustIconCircle}>
-                <Award size={24} color="#B89758" />
-              </div>
-              <h3 className={styles.trustTitle}>{c('trust2_title')}</h3>
-              <p className={styles.trustDesc}>
-                {c('trust2_desc')}
-              </p>
-            </div>
-
-            <div className={styles.trustItem}>
-              <div className={styles.trustIconCircle}>
-                <RefreshCw size={24} color="#B89758" />
-              </div>
-              <h3 className={styles.trustTitle}>{c('trust3_title')}</h3>
-              <p className={styles.trustDesc}>
-                {c('trust3_desc')}
-              </p>
-            </div>
-
-            <div className={styles.trustItem}>
-              <div className={styles.trustIconCircle}>
-                <ShieldCheck size={24} color="#B89758" />
-              </div>
-              <h3 className={styles.trustTitle}>{c('trust4_title')}</h3>
-              <p className={styles.trustDesc}>
-                {c('trust4_desc')}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

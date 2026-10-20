@@ -5,7 +5,7 @@
 
 :root {
   /* Color Palette */
-  --bg-primary: #FAF8F5;       /* Warm ivory / marfim suave */
+  --bg-primary: #F4EFE7;       /* Warm ivory / marfim suave */
   --bg-secondary: #F3EFE8;     /* Very light warm beige */
   --bg-surface: #FFFFFF;       /* Pure clean card surface */
   --bg-elevated: #FAF7F2;      /* Elevated subtle tint */
@@ -53,7 +53,7 @@
   --shadow-popover: 0 16px 48px rgba(26, 26, 26, 0.09);
 
   /* Layout */
-  --header-height: 84px;
+  --header-height: 96px;
   --container-max: 1320px;
 }
 
