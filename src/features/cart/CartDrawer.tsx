@@ -20,6 +20,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout, onNaviga
 
   const items = cart?.items || [];
   const total = cart?.total || 0;
+  const freeShippingAvailable = cart?.freeShippingAvailable !== false;
   const freeShippingThreshold = cart?.freeShippingThreshold || 500;
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - total);
   const freeShippingProgress = Math.min(100, (total / freeShippingThreshold) * 100);
@@ -54,6 +55,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout, onNaviga
         </div>
 
         {/* Free Shipping Progress Indicator */}
+        {freeShippingAvailable && (
         <div className={styles.shippingBarContainer}>
           {total >= freeShippingThreshold ? (
             <div className={styles.shippingAchieved}>
@@ -74,6 +76,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout, onNaviga
             />
           </div>
         </div>
+        )}
 
         {/* Items List */}
         <div className={styles.itemsList}>
@@ -153,7 +156,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout, onNaviga
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>Frete</span>
               <span className={styles.summaryValue}>
-                {total >= freeShippingThreshold ? 'Cortesia' : 'Calculado na entrega'}
+                {freeShippingAvailable && total >= freeShippingThreshold ? 'Cortesia' : 'Escolhido no checkout'}
               </span>
             </div>
             <div className={`${styles.summaryRow} ${styles.totalRow}`}>

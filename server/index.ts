@@ -14,6 +14,7 @@ import {
 import { registerAdminExtras } from './adminExtras.js';
 import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
+import { registerAdminCommerce, ESTOQUE_SQL, temVariantes, estoqueDaVariante, baixarEstoque, variantesDe, resolverEntrega, resolverPagamento, limiteFreteGratis } from './adminCommerce.js';
 import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
@@ -450,6 +451,7 @@ app.get('/api/catalog/products', (req: Request, res: Response) => {
     ...r,
     images: JSON.parse(r.images_json || '[]'),
     variants: JSON.parse(r.variants_json || '[]'),
+    variant_stock: variantesDe(r.id),
   }));
 
   res.json(products);
@@ -469,6 +471,7 @@ app.get('/api/catalog/products/:slug', (req: Request, res: Response) => {
     ...row,
     images: JSON.parse(row.images_json || '[]'),
     variants: JSON.parse(row.variants_json || '[]'),
+    variant_stock: variantesDe(row.id),
   });
 });
 
@@ -544,7 +547,7 @@ app.get('/api/cart', authMiddleware, (req: AuthenticatedRequest, res: Response) 
   const items = db
     .prepare(
       `
-    SELECT ci.id, ci.product_id, ci.variant_title, ci.quantity, p.name, p.price, p.image_primary, p.stock
+    SELECT ci.id, ci.product_id, ci.variant_title, ci.quantity, p.name, p.price, p.image_primary, ${ESTOQUE_SQL} AS stock
     FROM cart_items ci
     JOIN products p ON ci.product_id = p.id
     WHERE ci.cart_id = ?
@@ -567,7 +570,10 @@ app.get('/api/cart', authMiddleware, (req: AuthenticatedRequest, res: Response) 
   const thresholdRow = db.prepare("SELECT value FROM system_settings WHERE key = 'free_shipping_threshold'").get() as
     | { value: string }
     | undefined;
-  const freeShippingThreshold = thresholdRow ? parseFloat(thresholdRow.value) : 500.0;
+  const limiteLoja = limiteFreteGratis();
+  const semFretes = (db.prepare('SELECT COUNT(*) AS n FROM shipping_methods WHERE is_active = 1').get() as { n: number }).n === 0;
+  const freeShippingAvailable = limiteLoja !== null || semFretes;
+  const freeShippingThreshold = limiteLoja ?? (thresholdRow ? parseFloat(thresholdRow.value) : 500.0);
 
   res.json({
     cartId: cart.id,
@@ -575,25 +581,42 @@ app.get('/api/cart', authMiddleware, (req: AuthenticatedRequest, res: Response) 
     itemCount,
     total,
     freeShippingThreshold,
-    hasFreeShipping: total >= freeShippingThreshold,
+    freeShippingAvailable,
+    hasFreeShipping: freeShippingAvailable && total >= freeShippingThreshold,
   });
 });
 
 app.post('/api/cart/items', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
-  const { productId, variantTitle, quantity = 1 } = req.body;
+  const { productId } = req.body;
+  const quantity = Number(req.body.quantity ?? 1);
 
-  if (!productId || !variantTitle) {
+  if (!productId) {
     res.status(400).json({ error: 'Produto e variação são obrigatórios.' });
     return;
   }
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    res.status(400).json({ error: 'Quantidade inválida.' });
+    return;
+  }
 
-  const product = db.prepare('SELECT id, stock FROM products WHERE id = ?').get(productId) as
-    | { id: string; stock: number }
+  const product = db.prepare('SELECT id, stock, variants_json FROM products WHERE id = ? AND is_archived = 0').get(productId) as
+    | { id: string; stock: number; variants_json: string }
     | undefined;
   if (!product) {
     res.status(404).json({ error: 'Produto não encontrado.' });
     return;
+  }
+
+  // Produto sem variações usa a variação "Único"; com variações, a escolhida precisa existir e ter estoque próprio
+  const variantTitle = String(req.body.variantTitle || '').trim() || (JSON.parse(product.variants_json || '[]')[0] ?? 'Único');
+  if (temVariantes(product.id)) {
+    const linha = db.prepare('SELECT stock FROM product_variants WHERE product_id = ? AND title = ?').get(product.id, variantTitle) as { stock: number } | undefined;
+    if (!linha) {
+      res.status(400).json({ error: 'Variação indisponível para este produto.' });
+      return;
+    }
+    product.stock = linha.stock;
   }
 
   let cart = db.prepare('SELECT id FROM carts WHERE user_id = ?').get(userId) as { id: string } | undefined;
@@ -638,7 +661,7 @@ app.put('/api/cart/items/:id', authMiddleware, (req: AuthenticatedRequest, res: 
   const item = db
     .prepare(
       `
-    SELECT ci.id, ci.product_id, p.stock 
+    SELECT ci.id, ci.product_id, ${ESTOQUE_SQL} AS stock
     FROM cart_items ci
     JOIN carts c ON ci.cart_id = c.id
     JOIN products p ON ci.product_id = p.id
@@ -705,9 +728,9 @@ app.get('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Response
 
 app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
-  const { shippingAddress, paymentMethod, couponCode } = req.body;
+  const { shippingAddress, paymentMethod, paymentMethodId, couponCode } = req.body;
 
-  if (!shippingAddress || !paymentMethod) {
+  if (!shippingAddress || (!paymentMethod && !paymentMethodId)) {
     res.status(400).json({ error: 'Endereço de entrega e método de pagamento são obrigatórios.' });
     return;
   }
@@ -721,7 +744,7 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
   const items = db
     .prepare(
       `
-    SELECT ci.*, p.name, p.price, p.image_primary, p.stock
+    SELECT ci.*, p.name, p.price, p.image_primary, ${ESTOQUE_SQL} AS stock
     FROM cart_items ci
     JOIN products p ON ci.product_id = p.id
     WHERE ci.cart_id = ?
@@ -767,12 +790,24 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
     }
   }
 
-  const total = Math.max(0, subtotal - discount);
+  // Pagamento e entrega: sempre calculados aqui no servidor, nunca confiados ao navegador
+  const pag = resolverPagamento(req.body);
+  if (pag.erro) {
+    res.status(400).json({ error: pag.erro });
+    return;
+  }
+  const entrega = resolverEntrega(req.body.shippingMethodId, subtotal);
+  if (entrega.erro) {
+    res.status(400).json({ error: entrega.erro });
+    return;
+  }
+  const descontoPagamento = pag.metodo && pag.metodo.discount_percent > 0 ? Math.round(((subtotal - discount) * pag.metodo.discount_percent)) / 100 : 0;
+  const total = Math.max(0, subtotal - discount - descontoPagamento) + entrega.custo;
   const orderId = `PED-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 900 + 100)}`;
 
   db.prepare(
-    'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(orderId, userId, total, 'Confirmado', shippingAddress, paymentMethod);
+    'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method, shipping_method, shipping_cost, coupon_discount, payment_discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(orderId, userId, total, 'Confirmado', shippingAddress, pag.descricao || paymentMethod, entrega.metodo?.name ?? null, entrega.custo, discount, descontoPagamento);
   if (cupomUsado) registrarUsoCupom(cupomUsado, userId, orderId);
 
   const insertOrderItem = db.prepare(`
@@ -791,15 +826,15 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
       item.image_primary
     );
 
-    // Decrement stock & record movement
-    const prevStock = item.stock;
-    const newStock = Math.max(0, prevStock - item.quantity);
-    db.prepare('UPDATE products SET stock = ? WHERE id = ?').run(newStock, item.product_id);
+    // Decrement stock (da variação, quando houver) & record movement
+    const prevStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
+    baixarEstoque(item.product_id, item.variant_title, item.quantity);
+    const newStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
 
     db.prepare(`
       INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(item.product_id, -item.quantity, prevStock, newStock, `Venda aprovada Pedido ${orderId}`, userId);
+    `).run(item.product_id, newStock - prevStock, prevStock, newStock, `Venda aprovada Pedido ${orderId}${temVariantes(item.product_id) ? ` (${item.variant_title})` : ''}`, userId);
   }
 
   // Clear cart
@@ -809,6 +844,8 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
     success: true,
     orderId,
     total,
+    shippingCost: entrega.custo,
+    paymentDiscount: descontoPagamento,
     message: 'Pedido realizado com sucesso! Um e-mail com os detalhes da compra foi enviado.',
   });
 });
@@ -821,6 +858,7 @@ registerAdminExtras(app, painel);
 registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
 registerAdminCatalog(app, painel);
+registerAdminCommerce(app, painel, ownerAuthMiddleware as any);
 
 // 1. Admin Dashboard Overview
 app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
@@ -929,6 +967,7 @@ app.get('/api/admin/products', painel('produtos'), (_req: AuthenticatedRequest, 
     ...r,
     images: JSON.parse(r.images_json || '[]'),
     variants: JSON.parse(r.variants_json || '[]'),
+    variant_stock: variantesDe(r.id),
   }));
   res.json(products);
 });
@@ -1044,7 +1083,9 @@ app.put('/api/admin/products/:id', painel('produtos'), (req: AuthenticatedReques
   } = req.body;
 
   const prevStock = existing.stock;
-  const newStock = stock !== undefined ? parseInt(stock, 10) : prevStock;
+  // Produto com variações: estoque e lista de variações só mudam pelo editor de variações
+  const comVariacoes = temVariantes(id);
+  const newStock = !comVariacoes && stock !== undefined ? parseInt(stock, 10) : prevStock;
 
   db.prepare(`
     UPDATE products SET
@@ -1081,7 +1122,7 @@ app.put('/api/admin/products/:id', painel('produtos'), (req: AuthenticatedReques
     is_archived !== undefined ? (is_archived ? 1 : 0) : null,
     image_primary || null,
     images ? JSON.stringify(images) : null,
-    variants ? JSON.stringify(variants) : null,
+    variants && !comVariacoes ? JSON.stringify(variants) : null,
     id
   );
 
@@ -1196,7 +1237,8 @@ app.put('/api/admin/orders/:id/status', painel('pedidos'), (req: AuthenticatedRe
 app.get('/api/admin/stock', painel('estoque'), (_req: AuthenticatedRequest, res: Response) => {
   const products = db
     .prepare('SELECT id, name, category_id, stock, price, cost_price, image_primary FROM products WHERE is_archived = 0 ORDER BY stock ASC')
-    .all();
+    .all()
+    .map((p: any) => ({ ...p, variants: variantesDe(p.id) }));
 
   const movements = db
     .prepare(
@@ -1228,6 +1270,10 @@ app.post('/api/admin/stock/adjust', painel('estoque'), (req: AuthenticatedReques
     return;
   }
 
+  if (temVariantes(productId)) {
+    res.status(409).json({ error: 'Este produto tem variações com estoque próprio. Altere o estoque de cada variação.' });
+    return;
+  }
   const prevStock = product.stock;
   const change = parseInt(quantityChange, 10);
   const newStock = Math.max(0, prevStock + change);

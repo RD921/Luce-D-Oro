@@ -1,3 +1,4 @@
+import { IntroSound } from './features/intro/IntroSound';
 import { useState, useEffect } from 'react';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -94,6 +95,8 @@ function AppContent() {
         onOpenCheckout={() => setCheckoutModalOpen(true)}
         onNavigateCatalog={() => handleNavigate('category', primeiraCategoria)}
       />
+
+      <IntroSound pausado={adminOpen} />
 
       {/* Checkout Modal */}
       <CheckoutModal onOrderSuccess={() => setOrdersModalOpen(true)} />

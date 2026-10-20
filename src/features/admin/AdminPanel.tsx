@@ -3,11 +3,11 @@ import {
   LayoutDashboard, Package, ShoppingCart, Archive, Image, Tag, Settings,
   Shield, X, Plus, Edit2, Trash2, Search,
   AlertTriangle, Users, ArrowUpCircle, ArrowDownCircle,
-  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText
+  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
-import { api, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights } from '../../services/api';
+import { api, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -113,7 +113,7 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 // ============================================================
 // TABS
 // ============================================================
-type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'team' | 'settings' | 'audit';
+type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'shipping' | 'payments' | 'team' | 'settings' | 'audit';
 
 // area = nome da área no servidor; owner = só o proprietário vê
 interface Tab { id: TabId; label: string; icon: React.ReactNode; group: string; area?: string; owner?: boolean }
@@ -128,6 +128,8 @@ const TABS: Tab[] = [
   { id: 'banners',    label: 'Banners',      icon: <Image size={15} />,           group: 'Sistema', area: 'banners' },
   { id: 'coupons',    label: 'Cupons',       icon: <Tag size={15} />,             group: 'Sistema', area: 'cupons' },
   { id: 'customers',  label: 'Clientes',     icon: <Users size={15} />,           group: 'Sistema', area: 'clientes' },
+  { id: 'shipping',   label: 'Entrega',      icon: <Truck size={15} />,           group: 'Sistema', area: 'entrega' },
+  { id: 'payments',   label: 'Pagamento',    icon: <CreditCard size={15} />,      group: 'Sistema', owner: true },
   { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
   { id: 'settings',   label: 'Configurações',icon: <Settings size={15} />,        group: 'Sistema', owner: true },
   { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} />,          group: 'Sistema', owner: true },
@@ -216,6 +218,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'banners'    && <BannersTab />}
           {activeTab === 'coupons'    && <CouponsTab />}
           {activeTab === 'customers'  && <CustomersTab />}
+          {activeTab === 'shipping'   && <ShippingTab />}
+          {activeTab === 'payments'   && isOwner && <PaymentsTab />}
           {activeTab === 'team'       && isOwner && <TeamTab />}
           {activeTab === 'settings'   && isOwner && <SettingsTab />}
           {activeTab === 'audit'      && isOwner && <AuditTab />}
@@ -531,6 +535,7 @@ function ProductsTab() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Product | null>(null);
   const [photosOf, setPhotosOf] = useState<Product | null>(null);
+  const [variantsOf, setVariantsOf] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const [verArquivados, setVerArquivados] = useState(false);
 
@@ -643,6 +648,9 @@ function ProductsTab() {
                         <button className={styles.btnIcon} title="Trocar fotos" onClick={() => setPhotosOf(p)}>
                           <Image size={13} />
                         </button>
+                        <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} title="Variações e estoque de cada uma" onClick={() => setVariantsOf(p)}>
+                          Variações{(p.variant_stock?.length ?? 0) > 0 ? ` (${p.variant_stock!.length})` : ''}
+                        </button>
                         <button
                           className={styles.btnIcon}
                           title="Editar"
@@ -672,6 +680,7 @@ function ProductsTab() {
         </div>
       </div>
 
+      {variantsOf && <VariantsModal product={variantsOf} onClose={() => setVariantsOf(null)} onSaved={() => { setVariantsOf(null); load(); }} />}
       {photosOf && <PhotosModal product={photosOf} onClose={() => setPhotosOf(null)} onSaved={() => { setPhotosOf(null); load(); }} />}
       {(editing || creating) && (
         <ProductModal
@@ -851,7 +860,8 @@ function ProductModal({ product, onClose, onSaved }: { product?: Product; onClos
             </div>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Estoque</label>
-              <input type="number" className={styles.formInput} value={form.stock} onChange={e => set('stock', e.target.value)} min={0} />
+              <input type="number" className={styles.formInput} value={form.stock} onChange={e => set('stock', e.target.value)} min={0} disabled={(product?.variant_stock?.length ?? 0) > 0} />
+              {(product?.variant_stock?.length ?? 0) > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>Soma das variações. Altere em “Variações”.</span>}
             </div>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Preço de Venda (R$) *</label>
@@ -882,7 +892,8 @@ function ProductModal({ product, onClose, onSaved }: { product?: Product; onClos
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
               <label className={styles.formLabel}>Variantes disponíveis (uma por linha)</label>
-              <textarea className={styles.formInput} rows={3} value={form.variants} onChange={e => set('variants', e.target.value)} placeholder="Ex: 14K Ouro Amarelo&#10;18K Ouro Rosé" />
+              <textarea className={styles.formInput} rows={3} value={form.variants} onChange={e => set('variants', e.target.value)} disabled={(product?.variant_stock?.length ?? 0) > 0} placeholder="Ex: 14K Ouro Amarelo&#10;18K Ouro Rosé" />
+              <span style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>Para controlar o estoque de cada variação, use o botão “Variações” na lista de produtos.</span>
             </div>
             <div className={`${styles.formGroup} ${styles.formGridFull}`}>
               <label className={styles.formLabel}>Descrição</label>
@@ -1063,6 +1074,14 @@ function OrderDetailModal({ order, onClose, onUpdate }: { order: Order; onClose:
               <div className={styles.formLabel}>Pagamento</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem' }}>{order.payment_method}</div>
             </div>
+            <div>
+              <div className={styles.formLabel}>Entrega</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem' }}>
+                {order.shipping_method || '—'}{order.shipping_method ? ` · ${order.shipping_cost ? fmt(order.shipping_cost) : 'Cortesia'}` : ''}
+                {(order.coupon_discount ?? 0) > 0 && <div>Cupom: − {fmt(order.coupon_discount)}</div>}
+                {(order.payment_discount ?? 0) > 0 && <div>Desconto do pagamento: − {fmt(order.payment_discount)}</div>}
+              </div>
+            </div>
           </div>
 
           <div className={styles.formLabel} style={{ marginBottom: '0.5rem' }}>Itens do Pedido</div>
@@ -1114,12 +1133,12 @@ function OrderDetailModal({ order, onClose, onUpdate }: { order: Order; onClose:
 // TAB: STOCK
 // ============================================================
 function StockTab() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<StockProduct[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, isOwner } = useAuth();
   const podeApagar = isOwner || user?.areas?.produtos === 'rw';
-  const [adjusting, setAdjusting] = useState<{ product: Product; qty: string; reason: string; modo: 'somar' | 'definir' } | null>(null);
+  const [adjusting, setAdjusting] = useState<{ product: StockProduct; qty: string; reason: string; modo: 'somar' | 'definir'; variante?: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -1137,7 +1156,9 @@ function StockTab() {
     if (!adjusting) return;
     if (adjusting.qty === '') { alert('Informe a quantidade.'); return; }
     try {
-      if (adjusting.modo === 'definir') {
+      if (adjusting.variante) {
+        await api.admin.setVariantStock(adjusting.product.id, adjusting.variante, Number(adjusting.qty), adjusting.reason.trim());
+      } else if (adjusting.modo === 'definir') {
         await api.admin.setStock(adjusting.product.id, Number(adjusting.qty), adjusting.reason.trim());
       } else {
         if (!adjusting.reason.trim()) { alert('Informe o motivo do ajuste.'); return; }
@@ -1148,7 +1169,7 @@ function StockTab() {
     } catch (e: any) { alert(e.message); }
   };
 
-  const apagar = async (p: Product) => {
+  const apagar = async (p: StockProduct) => {
     if (!confirm(`Apagar "${p.name}" do estoque e da loja?\n\nSe já houve vendas dele, ele será apenas arquivado (some da loja, mantém o histórico).`)) return;
     try {
       await api.admin.deleteProductForever(p.id);
@@ -1174,17 +1195,30 @@ function StockTab() {
                       <td>
                         <div className={styles.productName} style={{ fontSize: '0.8rem' }}>{p.name}</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--adm-text-muted)' }}>{p.category_id}</div>
+                        {p.variants.length > 0 && (
+                          <div style={{ marginTop: 6, display: 'grid', gap: 3 }}>
+                            {p.variants.map(v => (
+                              <div key={v.title} style={{ fontSize: '0.72rem', display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <span style={{ color: 'var(--adm-text-muted)' }}>{v.title}:</span>
+                                <span className={v.stock === 0 ? styles.stockOut : v.stock <= 3 ? styles.stockLow : styles.stockOk}>{v.stock} un.</span>
+                                <button className={styles.btnIcon} title="Alterar esta variação" onClick={() => setAdjusting({ product: p, qty: String(v.stock), reason: '', modo: 'definir', variante: v.title })}><Edit2 size={11} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className={p.stock === 0 ? styles.stockOut : p.stock <= 3 ? styles.stockLow : styles.stockOk}>
                         {p.stock} un.
                       </td>
                       <td>
-                        <button
-                          className={`${styles.btnSmall} ${styles.btnSmallGhost}`}
-                          onClick={() => setAdjusting({ product: p, qty: String(p.stock), reason: '', modo: 'definir' })}
-                        >
-                          <Edit2 size={11} /> Alterar
-                        </button>
+                        {p.variants.length === 0 && (
+                          <button
+                            className={`${styles.btnSmall} ${styles.btnSmallGhost}`}
+                            onClick={() => setAdjusting({ product: p, qty: String(p.stock), reason: '', modo: 'definir' })}
+                          >
+                            <Edit2 size={11} /> Alterar
+                          </button>
+                        )}
                         {podeApagar && (
                           <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} style={{ marginLeft: 6 }} title="Apagar produto" onClick={() => apagar(p)}>
                             <Trash2 size={13} />
@@ -1242,7 +1276,8 @@ function StockTab() {
                   {adjusting.product.stock} unidades
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+              {adjusting.variante && <div style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>Variação: <strong>{adjusting.variante}</strong></div>}
+              <div style={{ display: adjusting.variante ? 'none' : 'flex', gap: 8, marginBottom: '1rem' }}>
                 <button className={`${styles.btnSmall} ${adjusting.modo === 'definir' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAdjusting(a => a ? { ...a, modo: 'definir', qty: String(a.product.stock) } : null)}>Definir total</button>
                 <button className={`${styles.btnSmall} ${adjusting.modo === 'somar' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAdjusting(a => a ? { ...a, modo: 'somar', qty: '' } : null)}>Somar / subtrair</button>
               </div>
@@ -1955,7 +1990,6 @@ function SettingsTab() {
     { key: 'store_email', label: 'E-mail de Contato', placeholder: 'contato@cddeouro.com.br', type: 'email' },
     { key: 'store_phone', label: 'Telefone / WhatsApp', placeholder: '+55 11 99999-9999' },
     { key: 'store_instagram', label: 'Instagram (@ ou URL)', placeholder: '@cddeouro' },
-    { key: 'free_shipping_threshold', label: 'Frete Grátis a partir de (R$)', placeholder: '350', type: 'number' },
     { key: 'store_cnpj', label: 'CNPJ', placeholder: '00.000.000/0001-00' },
     { key: 'store_address', label: 'Endereço Completo', placeholder: 'Rua das Joias, 100 — São Paulo, SP' },
     { key: 'meta_description', label: 'Meta Description (SEO)', placeholder: 'Joias folheadas e semi-joias premium' },
@@ -2120,6 +2154,345 @@ function CustomersTab() {
         </div>
       )}
     </>
+  );
+}
+
+// ---- Variações com estoque próprio ----
+function VariantsModal({ product, onClose, onSaved }: { product: { id: string; name: string; stock: number }; onClose: () => void; onSaved: () => void }) {
+  const [linhas, setLinhas] = useState<Array<{ title: string; stock: string }>>([]);
+  const [usa, setUsa] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.admin.getVariants(product.id).then(r => {
+      setUsa(r.usaVariantes);
+      if (r.usaVariantes) setLinhas(r.variantes.map(v => ({ title: v.title, stock: String(v.stock) })));
+      else {
+        // primeira vez: usa os nomes já cadastrados e coloca todo o estoque atual na primeira
+        const nomes = r.titulosAntigos.length ? r.titulosAntigos : ['Único'];
+        setLinhas(nomes.map((t, i) => ({ title: t, stock: String(i === 0 ? r.estoqueTotal : 0) })));
+      }
+    }).catch((e: any) => setError(e.message)).finally(() => setLoading(false));
+  }, [product.id]);
+
+  const soma = linhas.reduce((a, l) => a + (Number(l.stock) || 0), 0);
+  const mudar = (i: number, k: 'title' | 'stock', v: string) => setLinhas(ls => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
+
+  const salvar = async (vazio = false) => {
+    setSaving(true); setError('');
+    try {
+      await api.admin.setVariants(product.id, vazio ? [] : linhas.map(l => ({ title: l.title.trim(), stock: Number(l.stock) })));
+      onSaved();
+    } catch (e: any) { setError(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>Variações — {product.name}</span>
+          <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className={styles.modalBody}>
+          {error && <div className={`${styles.alertRow} ${styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{error}</div></div>}
+          {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
+            <>
+              <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-muted)', marginTop: 0 }}>
+                {usa ? 'Cada variação tem seu próprio estoque; o total do produto é a soma.' : `Hoje o produto tem um estoque único (${product.stock} un.). Ao salvar, ele passa a ser controlado por variação.`}
+              </p>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {linhas.map((l, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8 }}>
+                    <input className={styles.formInput} placeholder="Nome (ex: Aro 16)" value={l.title} onChange={e => mudar(i, 'title', e.target.value)} />
+                    <input type="number" min={0} className={styles.formInput} style={{ width: 110 }} value={l.stock} onChange={e => mudar(i, 'stock', e.target.value)} />
+                    <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} title="Remover" onClick={() => setLinhas(ls => ls.filter((_, j) => j !== i))}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, alignItems: 'center' }}>
+                <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setLinhas(ls => [...ls, { title: '', stock: '0' }])}><Plus size={12} /> Adicionar variação</button>
+                <span style={{ fontSize: '0.8rem' }}>Total: <strong>{soma} un.</strong></span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className={styles.modalFooter}>
+          {usa && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ marginRight: 'auto', color: 'var(--adm-red)' }} disabled={saving} onClick={() => { if (confirm('Voltar ao estoque único? O total atual é mantido.')) void salvar(true); }}>Voltar ao estoque único</button>}
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={saving || loading || linhas.length === 0} onClick={() => salvar(false)}>{saving ? 'Salvando…' : 'Salvar variações'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: ENTREGA (fretes e prazos)
+// ============================================================
+function ShippingTab() {
+  const [lista, setLista] = useState<AdminShipping[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editando, setEditando] = useState<AdminShipping | 'novo' | null>(null);
+
+  const load = async () => {
+    try { setLista(await api.admin.getShipping()); } catch (e: any) { alert(e.message); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const alternar = async (m: AdminShipping) => {
+    try { await api.admin.updateShipping(m.id, { is_active: m.is_active ? 0 : 1 }); load(); } catch (e: any) { alert(e.message); }
+  };
+  const apagar = async (m: AdminShipping) => {
+    if (!confirm(`Remover "${m.name}"? Pedidos antigos continuam com o frete que pagaram.`)) return;
+    try { await api.admin.deleteShipping(m.id); load(); } catch (e: any) { alert(e.message); }
+  };
+  const prazo = (m: AdminShipping) => (m.days_min === m.days_max ? `${m.days_min}` : `${m.days_min} a ${m.days_max}`) + ' dias úteis';
+
+  return (
+    <>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Formas de entrega</span>
+        <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={() => setEditando('novo')}><Plus size={13} /> Nova forma de entrega</button>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-muted)', margin: '0 0 1rem' }}>
+        O cliente escolhe entre as formas ativas no checkout. O valor, o prazo e o “frete grátis a partir de” são calculados no servidor — não dá para o cliente alterar.
+        Sem nenhuma forma ativa, o frete fica zerado.
+      </p>
+      <div className={styles.tableWrapper}>
+        {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
+          <table>
+            <thead><tr><th>Nome</th><th>Valor</th><th>Prazo</th><th>Grátis a partir de</th><th>Na loja</th><th>Ações</th></tr></thead>
+            <tbody>
+              {lista.length === 0 && <tr><td colSpan={6} className={styles.emptyState}>Nenhuma forma de entrega cadastrada.</td></tr>}
+              {lista.map(m => (
+                <tr key={m.id}>
+                  <td><div className={styles.productName}>{m.name}</div><div className={styles.productSlug}>{m.description}</div></td>
+                  <td className={styles.price}>{fmt(m.price)}</td>
+                  <td style={{ fontSize: '0.78rem' }}>{prazo(m)}</td>
+                  <td style={{ fontSize: '0.78rem' }}>{m.free_above !== null ? fmt(m.free_above) : '—'}</td>
+                  <td><button className={`${styles.statusPill} ${m.is_active ? styles.statusConfirmed : styles.statusCancelled}`} style={{ cursor: 'pointer', border: 'none' }} onClick={() => alternar(m)}>{m.is_active ? 'Ativa' : 'Desativada'}</button></td>
+                  <td>
+                    <div className={styles.actionBtns}>
+                      <button className={styles.btnIcon} onClick={() => setEditando(m)} title="Editar"><Edit2 size={13} /></button>
+                      <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => apagar(m)} title="Remover"><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {editando && <ShippingModal item={editando === 'novo' ? null : editando} onClose={() => setEditando(null)} onSaved={() => { setEditando(null); load(); }} />}
+    </>
+  );
+}
+
+function ShippingModal({ item, onClose, onSaved }: { item: AdminShipping | null; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({
+    name: item?.name ?? '', description: item?.description ?? '', price: item ? String(item.price) : '', days_min: item ? String(item.days_min) : '3', days_max: item ? String(item.days_max) : '7',
+    free_above: item?.free_above != null ? String(item.free_above) : '', is_active: item ? Boolean(item.is_active) : true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k: string, v: any) => setF(x => ({ ...x, [k]: v }));
+
+  const salvar = async () => {
+    setSaving(true); setError('');
+    const corpo = { name: f.name, description: f.description, price: Number(f.price || 0), days_min: Number(f.days_min), days_max: Number(f.days_max), free_above: f.free_above === '' ? null : Number(f.free_above), is_active: f.is_active ? 1 : 0 };
+    try {
+      if (item) await api.admin.updateShipping(item.id, corpo); else await api.admin.createShipping(corpo);
+      onSaved();
+    } catch (e: any) { setError(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>{item ? `Editar: ${item.name}` : 'Nova forma de entrega'}</span>
+          <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className={styles.modalBody}>
+          {error && <div className={`${styles.alertRow} ${styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{error}</div></div>}
+          <div className={styles.formGrid}>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Nome *</label>
+              <input className={styles.formInput} value={f.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Sedex, Entrega Padrão, Retirada na loja" />
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Descrição (aparece no checkout)</label>
+              <input className={styles.formInput} value={f.description} onChange={e => set('description', e.target.value)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Valor (R$)</label>
+              <input type="number" min={0} step="0.01" className={styles.formInput} value={f.price} onChange={e => set('price', e.target.value)} placeholder="0 = grátis" />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Grátis para compras a partir de (R$)</label>
+              <input type="number" min={0} step="0.01" className={styles.formInput} value={f.free_above} onChange={e => set('free_above', e.target.value)} placeholder="vazio = nunca grátis" />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Prazo mínimo (dias úteis)</label>
+              <input type="number" min={0} className={styles.formInput} value={f.days_min} onChange={e => set('days_min', e.target.value)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Prazo máximo (dias úteis)</label>
+              <input type="number" min={0} className={styles.formInput} value={f.days_max} onChange={e => set('days_max', e.target.value)} />
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.switchLabel}>
+                <input type="checkbox" className={styles.switchInput} checked={f.is_active} onChange={e => set('is_active', e.target.checked)} />
+                Disponível no checkout
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className={styles.modalFooter}>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={salvar} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: PAGAMENTO (somente proprietário)
+// ============================================================
+const TIPOS_PAGAMENTO: Record<string, string> = { pix: 'Pix', card: 'Cartão de crédito', boleto: 'Boleto', other: 'Outro' };
+
+function PaymentsTab() {
+  const [lista, setLista] = useState<AdminPayment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editando, setEditando] = useState<AdminPayment | 'novo' | null>(null);
+
+  const load = async () => {
+    try { setLista(await api.admin.getPayments()); } catch (e: any) { alert(e.message); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const alternar = async (m: AdminPayment) => {
+    try { await api.admin.updatePayment(m.id, { is_active: m.is_active ? 0 : 1 }); load(); } catch (e: any) { alert(e.message); }
+  };
+  const apagar = async (m: AdminPayment) => {
+    if (!confirm(`Remover "${m.name}"?`)) return;
+    try { await api.admin.deletePayment(m.id); load(); } catch (e: any) { alert(e.message); }
+  };
+
+  return (
+    <>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Formas de pagamento</span>
+        <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={() => setEditando('novo')}><Plus size={13} /> Nova forma de pagamento</button>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-muted)', margin: '0 0 1rem' }}>
+        Define o que aparece no checkout, o desconto de cada forma (por exemplo, Pix) e o máximo de parcelas sem juros do cartão. O desconto é aplicado no servidor.
+        A loja ainda não cobra de verdade: o pedido é registrado com a forma escolhida.
+      </p>
+      <div className={styles.tableWrapper}>
+        {loading ? <div className={styles.loader}><div className={styles.spinner}/></div> : (
+          <table>
+            <thead><tr><th>Nome</th><th>Tipo</th><th>Desconto</th><th>Parcelas</th><th>No checkout</th><th>Ações</th></tr></thead>
+            <tbody>
+              {lista.length === 0 && <tr><td colSpan={6} className={styles.emptyState}>Nenhuma forma de pagamento cadastrada.</td></tr>}
+              {lista.map(m => (
+                <tr key={m.id}>
+                  <td><div className={styles.productName}>{m.name}</div><div className={styles.productSlug}>{m.description}</div></td>
+                  <td style={{ fontSize: '0.78rem' }}>{TIPOS_PAGAMENTO[m.kind] ?? m.kind}</td>
+                  <td>{m.discount_percent > 0 ? `${m.discount_percent}%` : '—'}</td>
+                  <td>{m.kind === 'card' ? `até ${m.max_installments}x` : '—'}</td>
+                  <td><button className={`${styles.statusPill} ${m.is_active ? styles.statusConfirmed : styles.statusCancelled}`} style={{ cursor: 'pointer', border: 'none' }} onClick={() => alternar(m)}>{m.is_active ? 'Ativa' : 'Desativada'}</button></td>
+                  <td>
+                    <div className={styles.actionBtns}>
+                      <button className={styles.btnIcon} onClick={() => setEditando(m)} title="Editar"><Edit2 size={13} /></button>
+                      <button className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => apagar(m)} title="Remover"><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {editando && <PaymentModal item={editando === 'novo' ? null : editando} onClose={() => setEditando(null)} onSaved={() => { setEditando(null); load(); }} />}
+    </>
+  );
+}
+
+function PaymentModal({ item, onClose, onSaved }: { item: AdminPayment | null; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({
+    name: item?.name ?? '', description: item?.description ?? '', kind: item?.kind ?? 'pix', discount_percent: item ? String(item.discount_percent) : '0',
+    max_installments: item ? String(item.max_installments) : '1', is_active: item ? Boolean(item.is_active) : true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k: string, v: any) => setF(x => ({ ...x, [k]: v }));
+
+  const salvar = async () => {
+    setSaving(true); setError('');
+    const corpo = { name: f.name, description: f.description, kind: f.kind, discount_percent: Number(f.discount_percent || 0), max_installments: f.kind === 'card' ? Number(f.max_installments || 1) : 1, is_active: f.is_active ? 1 : 0 };
+    try {
+      if (item) await api.admin.updatePayment(item.id, corpo); else await api.admin.createPayment(corpo);
+      onSaved();
+    } catch (e: any) { setError(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>{item ? `Editar: ${item.name}` : 'Nova forma de pagamento'}</span>
+          <button className={styles.modalCloseBtn} onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className={styles.modalBody}>
+          {error && <div className={`${styles.alertRow} ${styles.alertRowDanger}`} style={{ marginBottom: '1rem' }}><div className={styles.alertMsg}>{error}</div></div>}
+          <div className={styles.formGrid}>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Nome *</label>
+              <input className={styles.formInput} value={f.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Pix Instantâneo" />
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.formLabel}>Descrição (aparece no checkout)</label>
+              <input className={styles.formInput} value={f.description} onChange={e => set('description', e.target.value)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Tipo</label>
+              <select className={styles.formInput} value={f.kind} onChange={e => set('kind', e.target.value)}>
+                {Object.entries(TIPOS_PAGAMENTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Desconto (%)</label>
+              <input type="number" min={0} max={90} step="0.5" className={styles.formInput} value={f.discount_percent} onChange={e => set('discount_percent', e.target.value)} />
+            </div>
+            {f.kind === 'card' && (
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Máximo de parcelas sem juros</label>
+                <input type="number" min={1} max={24} className={styles.formInput} value={f.max_installments} onChange={e => set('max_installments', e.target.value)} />
+              </div>
+            )}
+            <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+              <label className={styles.switchLabel}>
+                <input type="checkbox" className={styles.switchInput} checked={f.is_active} onChange={e => set('is_active', e.target.checked)} />
+                Disponível no checkout
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className={styles.modalFooter}>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Cancelar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} onClick={salvar} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

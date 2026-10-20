@@ -42,6 +42,7 @@ export interface Product {
   image_primary: string;
   images: string[];
   variants: string[];
+  variant_stock?: Array<{ title: string; stock: number }>;
   created_at?: string;
 }
 
@@ -62,6 +63,7 @@ export interface CartResponse {
   itemCount: number;
   total: number;
   freeShippingThreshold: number;
+  freeShippingAvailable?: boolean;
   hasFreeShipping: boolean;
 }
 
@@ -82,6 +84,10 @@ export interface Order {
   status: string;
   shipping_address: string;
   payment_method: string;
+  shipping_method?: string | null;
+  shipping_cost?: number;
+  coupon_discount?: number;
+  payment_discount?: number;
   tracking_code?: string;
   internal_notes?: string;
   created_at: string;
@@ -149,6 +155,11 @@ export interface AdminAlert {
   message: string;
   link?: string;
 }
+
+export type StockProduct = Omit<Product, 'variants'> & { variants: Array<{ title: string; stock: number }> };
+
+export interface AdminShipping { id: string; name: string; description: string; price: number; days_min: number; days_max: number; free_above: number | null; is_active: number; display_order: number }
+export interface AdminPayment { id: string; name: string; description: string; kind: string; discount_percent: number; max_installments: number; is_active: number; display_order: number }
 
 export interface DashboardInsights {
   periodo: string;
@@ -296,11 +307,19 @@ export const api = {
   orders: {
     list: () => request<Order[]>('/api/orders'),
 
-    create: (payload: { shippingAddress: string; paymentMethod: string; couponCode?: string }) =>
-      request<{ success: boolean; orderId: string; total: number; message: string }>('/api/orders', {
+    create: (payload: { shippingAddress: string; paymentMethod?: string; paymentMethodId?: string; installments?: number; shippingMethodId?: string; couponCode?: string }) =>
+      request<{ success: boolean; orderId: string; total: number; shippingCost?: number; paymentDiscount?: number; message: string }>('/api/orders', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+  },
+
+  checkout: {
+    options: (subtotal: number) =>
+      request<{
+        shipping: Array<{ id: string; name: string; description: string; prazo: string; basePrice: number; price: number; free: boolean; freeAbove: number | null }>;
+        payments: Array<{ id: string; name: string; description: string; kind: string; discountPercent: number; maxInstallments: number }>;
+      }>(`/api/checkout/options?subtotal=${encodeURIComponent(subtotal)}`),
   },
 
   banners: {
@@ -381,7 +400,7 @@ export const api = {
         body: JSON.stringify(payload),
       }),
 
-    getStock: () => request<{ products: Product[]; movements: StockMovement[] }>('/api/admin/stock'),
+    getStock: () => request<{ products: StockProduct[]; movements: StockMovement[] }>('/api/admin/stock'),
 
     adjustStock: (productId: string, quantityChange: number, reason: string) =>
       request<{ success: boolean; message: string; newStock: number }>('/api/admin/stock/adjust', {
@@ -501,6 +520,22 @@ export const api = {
       request<{ success: boolean; message: string }>(`/api/admin/products/${id}/restore`, { method: 'POST' }),
     deleteProductForever: (id: string) =>
       request<{ success: boolean; message: string }>(`/api/admin/products/${id}/permanent`, { method: 'DELETE' }),
+
+    // ---- Frete, pagamento e variações ----
+    getShipping: () => request<AdminShipping[]>('/api/admin/shipping'),
+    createShipping: (d: Partial<AdminShipping>) => request<{ success: boolean; id: string; message: string }>('/api/admin/shipping', { method: 'POST', body: JSON.stringify(d) }),
+    updateShipping: (id: string, d: Partial<AdminShipping>) => request<{ success: boolean; message: string }>(`/api/admin/shipping/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+    deleteShipping: (id: string) => request<{ success: boolean; message: string }>(`/api/admin/shipping/${id}`, { method: 'DELETE' }),
+    getPayments: () => request<AdminPayment[]>('/api/admin/payment-methods'),
+    createPayment: (d: Partial<AdminPayment>) => request<{ success: boolean; id: string; message: string }>('/api/admin/payment-methods', { method: 'POST', body: JSON.stringify(d) }),
+    updatePayment: (id: string, d: Partial<AdminPayment>) => request<{ success: boolean; message: string }>(`/api/admin/payment-methods/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+    deletePayment: (id: string) => request<{ success: boolean; message: string }>(`/api/admin/payment-methods/${id}`, { method: 'DELETE' }),
+    getVariants: (id: string) =>
+      request<{ usaVariantes: boolean; variantes: Array<{ title: string; stock: number }>; titulosAntigos: string[]; estoqueTotal: number }>(`/api/admin/products/${id}/variants`),
+    setVariants: (id: string, variantes: Array<{ title: string; stock: number }>) =>
+      request<{ success: boolean; estoqueTotal: number; message: string }>(`/api/admin/products/${id}/variants`, { method: 'PUT', body: JSON.stringify({ variantes }) }),
+    setVariantStock: (productId: string, variant: string, quantity: number, reason: string) =>
+      request<{ success: boolean; message: string }>('/api/admin/stock/set', { method: 'POST', body: JSON.stringify({ productId, variant, quantity, reason }) }),
 
     getInsights: (period = '30d') =>
       request<DashboardInsights>(`/api/admin/dashboard/insights?period=${period}`),

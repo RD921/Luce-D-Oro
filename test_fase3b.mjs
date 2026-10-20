@@ -92,7 +92,8 @@ async function principal() {
   const dep = (await api('GET', '/api/admin/categories', dono)).json.map((c) => c.id);
   ok(JSON.stringify(dep) === JSON.stringify(invertida), 'nova ordem vale', dep);
   const pubCats = (await api('GET', '/api/catalog/categories', null)).json;
-  ok(JSON.stringify(pubCats.map((c) => c.id)) === JSON.stringify(invertida), 'loja mostra a nova ordem');
+  const ativas = new Set(pubCats.map((c) => c.id));
+  ok(JSON.stringify(pubCats.map((c) => c.id)) === JSON.stringify(invertida.filter((x) => ativas.has(x))), 'loja mostra a nova ordem');
   ok((await api('PUT', '/api/admin/categories-order', dono, { ids: ['nao-existe'] })).status === 400, 'ordem com categoria inexistente é recusada');
   ok((await api('PUT', '/api/admin/categories-order', dono, { ids: [ids[0], ids[0]] })).status === 400, 'ordem com repetida é recusada');
   ok((await api('PUT', '/api/admin/categories-order', atd, { ids })).status === 403, 'atendente não reordena');
@@ -119,7 +120,7 @@ async function principal() {
   }
   r = await api('GET', '/api/admin/dashboard/insights?period=30d', dono);
   const rec = r.json.serie.reduce((a, d) => a + d.receita, 0);
-  ok(rec > 0 && r.json.porCategoria.length > 0 && r.json.pagamentos.some((x) => x.metodo === 'Pix'), 'mostra a venda de teste por dia, categoria e pagamento', r.json);
+  ok(rec > 0 && r.json.porCategoria.length > 0 && r.json.pagamentos.some((x) => /^Pix/.test(x.metodo)), 'mostra a venda de teste por dia, categoria e pagamento', r.json);
   ok(r.json.anterior && typeof r.json.anterior.receita === 'number', 'traz o período anterior para comparar');
   ok(typeof r.json.estoque.pecas === 'number' && r.json.aguardando >= 1, 'estoque e pedidos a atender');
   const d90 = await api('GET', '/api/admin/dashboard?period=90d', dono);

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2, ShieldCheck, CreditCard, QrCode, Lock, Loader2, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle2, ShieldCheck, CreditCard, QrCode, Lock, Loader2, ArrowRight, Truck, Landmark } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+
+type Opcoes = Awaited<ReturnType<typeof api.checkout.options>>;
 import styles from './CheckoutModal.module.css';
 
 interface CheckoutModalProps {
@@ -16,19 +18,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
   const [cep, setCep] = useState('01419-001');
   const [street, setStreet] = useState('Alameda Lorena, 1600 - Jardins');
   const [cityState, setCityState] = useState('São Paulo, SP');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card'>('credit_card');
+  const [opcoes, setOpcoes] = useState<Opcoes | null>(null);
+  const [shippingId, setShippingId] = useState('');
+  const [paymentId, setPaymentId] = useState('');
   const [cardHolder, setCardHolder] = useState(user?.name || '');
   const [cardNumber, setCardNumber] = useState('•••• •••• •••• 8842');
-  const [installments, setInstallments] = useState('10');
+  const [installments, setInstallments] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
 
+  const subtotalCarrinho = cart?.total || 0;
+  useEffect(() => {
+    if (!checkoutModalOpen) return;
+    let vivo = true;
+    api.checkout.options(subtotalCarrinho).then((o) => {
+      if (!vivo) return;
+      setOpcoes(o);
+      setShippingId((atual) => (o.shipping.some((x) => x.id === atual) ? atual : o.shipping[0]?.id ?? ''));
+      setPaymentId((atual) => (o.payments.some((x) => x.id === atual) ? atual : o.payments[0]?.id ?? ''));
+    }).catch(() => { if (vivo) setErrorMessage('Não foi possível carregar as opções de entrega e pagamento.'); });
+    return () => { vivo = false; };
+  }, [checkoutModalOpen, subtotalCarrinho]);
+
   if (!checkoutModalOpen) return null;
 
-  const total = cart?.total || 0;
-  const pixDiscount = total * 0.05;
-  const finalTotal = paymentMethod === 'pix' ? total - pixDiscount : total;
+  const total = subtotalCarrinho;
+  const entrega = opcoes?.shipping.find((x) => x.id === shippingId);
+  const pagamento = opcoes?.payments.find((x) => x.id === paymentId);
+  const ehCartao = pagamento?.kind === 'card';
+  const descontoPagamento = pagamento ? Math.round(total * pagamento.discountPercent) / 100 : 0;
+  const frete = entrega?.price ?? 0;
+  const finalTotal = Math.max(0, total - descontoPagamento) + frete;
+  const parcelasMax = pagamento?.maxInstallments ?? 1;
+  const opcoesParcelas = Array.from({ length: parcelasMax }, (_, i) => i + 1).filter((n) => n === 1 || n === parcelasMax || n % 3 === 0);
 
   const formatPrice = (val: number) => {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -46,11 +69,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
     setIsSubmitting(true);
     try {
       const addressString = `${street}, ${cityState} - CEP ${cep}`;
-      const paymentDesc = paymentMethod === 'pix' ? 'Pix à Vista (5% OFF)' : `Cartão de Crédito em ${installments}x`;
+      if (!pagamento) { setErrorMessage('Escolha uma forma de pagamento.'); setIsSubmitting(false); return; }
 
       const res = await api.orders.create({
         shippingAddress: addressString,
-        paymentMethod: paymentDesc,
+        paymentMethodId: pagamento.id,
+        installments: ehCartao ? Math.min(Number(installments) || 1, parcelasMax) : 1,
+        shippingMethodId: entrega?.id,
       });
 
       setConfirmedOrderId(res.orderId);
@@ -159,44 +184,47 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
               </div>
             </div>
 
+            {/* Shipping Options */}
+            {opcoes && opcoes.shipping.length > 0 && (
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>2. Forma de Entrega</h3>
+                <div className={styles.paymentMethodsGrid}>
+                  {opcoes.shipping.map((m) => (
+                    <label key={m.id} className={`${styles.paymentCard} ${shippingId === m.id ? styles.paymentCardActive : ''}`}>
+                      <input type="radio" name="shipping" value={m.id} checked={shippingId === m.id} onChange={() => setShippingId(m.id)} className={styles.radioInput} />
+                      <Truck size={18} color={shippingId === m.id ? '#B89758' : '#767676'} />
+                      <div className={styles.paymentText}>
+                        <span className={styles.paymentTitle}>{m.name}</span>
+                        <span className={styles.paymentSubtitle}>{m.prazo} · {m.free ? 'Cortesia' : formatPrice(m.price)}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Payment Options */}
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>2. Método de Pagamento</h3>
+              <h3 className={styles.sectionTitle}>{opcoes && opcoes.shipping.length > 0 ? '3' : '2'}. Método de Pagamento</h3>
               <div className={styles.paymentMethodsGrid}>
-                <label className={`${styles.paymentCard} ${paymentMethod === 'credit_card' ? styles.paymentCardActive : ''}`}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="credit_card"
-                    checked={paymentMethod === 'credit_card'}
-                    onChange={() => setPaymentMethod('credit_card')}
-                    className={styles.radioInput}
-                  />
-                  <CreditCard size={18} color={paymentMethod === 'credit_card' ? '#B89758' : '#767676'} />
-                  <div className={styles.paymentText}>
-                    <span className={styles.paymentTitle}>Cartão de Crédito</span>
-                    <span className={styles.paymentSubtitle}>Até 10x sem juros</span>
-                  </div>
-                </label>
-
-                <label className={`${styles.paymentCard} ${paymentMethod === 'pix' ? styles.paymentCardActive : ''}`}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="pix"
-                    checked={paymentMethod === 'pix'}
-                    onChange={() => setPaymentMethod('pix')}
-                    className={styles.radioInput}
-                  />
-                  <QrCode size={18} color={paymentMethod === 'pix' ? '#B89758' : '#767676'} />
-                  <div className={styles.paymentText}>
-                    <span className={styles.paymentTitle}>Pix Instantâneo</span>
-                    <span className={styles.paymentDiscountBadge}>5% de Desconto</span>
-                  </div>
-                </label>
+                {(opcoes?.payments ?? []).map((m) => (
+                  <label key={m.id} className={`${styles.paymentCard} ${paymentId === m.id ? styles.paymentCardActive : ''}`}>
+                    <input type="radio" name="payment" value={m.id} checked={paymentId === m.id} onChange={() => { setPaymentId(m.id); setInstallments('1'); }} className={styles.radioInput} />
+                    {m.kind === 'pix' ? <QrCode size={18} color={paymentId === m.id ? '#B89758' : '#767676'} />
+                      : m.kind === 'card' ? <CreditCard size={18} color={paymentId === m.id ? '#B89758' : '#767676'} />
+                      : <Landmark size={18} color={paymentId === m.id ? '#B89758' : '#767676'} />}
+                    <div className={styles.paymentText}>
+                      <span className={styles.paymentTitle}>{m.name}</span>
+                      {m.discountPercent > 0
+                        ? <span className={styles.paymentDiscountBadge}>{m.discountPercent}% de Desconto</span>
+                        : <span className={styles.paymentSubtitle}>{m.kind === 'card' && m.maxInstallments > 1 ? `Até ${m.maxInstallments}x sem juros` : m.description}</span>}
+                    </div>
+                  </label>
+                ))}
+                {opcoes && opcoes.payments.length === 0 && <p className={styles.subtitle}>Nenhuma forma de pagamento disponível no momento.</p>}
               </div>
 
-              {paymentMethod === 'credit_card' && (
+              {ehCartao && (
                 <div className={styles.cardDetailsBox}>
                   <div>
                     <label className={styles.fieldLabel}>Nome no Cartão</label>
@@ -226,10 +254,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
                         onChange={(e) => setInstallments(e.target.value)}
                         className={styles.input}
                       >
-                        <option value="1">1x de {formatPrice(total)} (sem juros)</option>
-                        <option value="3">3x de {formatPrice(total / 3)} (sem juros)</option>
-                        <option value="6">6x de {formatPrice(total / 6)} (sem juros)</option>
-                        <option value="10">10x de {formatPrice(total / 10)} (sem juros)</option>
+                        {opcoesParcelas.map((n) => (
+                          <option key={n} value={n}>{n}x de {formatPrice(finalTotal / n)} (sem juros)</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -243,16 +270,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
                 <span>Subtotal ({cart?.itemCount} peças)</span>
                 <span>{formatPrice(total)}</span>
               </div>
-              {paymentMethod === 'pix' && (
+              {pagamento && descontoPagamento > 0 && (
                 <div className={`${styles.summaryLine} ${styles.discountLine}`}>
-                  <span>Desconto Pix (5%)</span>
-                  <span>- {formatPrice(pixDiscount)}</span>
+                  <span>Desconto {pagamento.name} ({pagamento.discountPercent}%)</span>
+                  <span>- {formatPrice(descontoPagamento)}</span>
                 </div>
               )}
-              <div className={styles.summaryLine}>
-                <span>Frete Seguro Express</span>
-                <span>Cortesia</span>
-              </div>
+              {entrega && (
+                <div className={styles.summaryLine}>
+                  <span>{entrega.name}</span>
+                  <span>{entrega.free ? 'Cortesia' : formatPrice(entrega.price)}</span>
+                </div>
+              )}
               <div className={`${styles.summaryLine} ${styles.summaryTotalLine}`}>
                 <span>Total a Pagar</span>
                 <span>{formatPrice(finalTotal)}</span>
@@ -262,7 +291,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onOrderSuccess }) 
             <button
               type="submit"
               className={`btn-primary ${styles.submitOrderBtn}`}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !pagamento}
             >
               {isSubmitting ? (
                 <>

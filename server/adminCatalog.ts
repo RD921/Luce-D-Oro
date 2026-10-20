@@ -2,6 +2,7 @@
 import type { Express, Request, Response, RequestHandler } from 'express';
 import { db, logAudit } from './db.js';
 import type { Area } from './adminTeam.js';
+import { temVariantes, sincronizarTotal } from './adminCommerce.js';
 
 type Usuario = { id: number; email: string };
 const quem = (req: Request): Usuario => (req as unknown as { user: Usuario }).user;
@@ -45,6 +46,20 @@ export function registerAdminCatalog(app: Express, painel: (a: Area) => RequestH
     if (!p) { res.status(404).json({ error: 'Produto não encontrado.' }); return; }
     const motivo = String(reason || '').trim() || 'Contagem de estoque';
     const u = quem(req);
+    const variante = req.body?.variant !== undefined ? String(req.body.variant) : '';
+    if (temVariantes(p.id)) {
+      if (!variante) { res.status(409).json({ error: 'Este produto tem variações com estoque próprio. Informe qual variação alterar.' }); return; }
+      const v = db.prepare('SELECT stock FROM product_variants WHERE product_id = ? AND title = ?').get(p.id, variante) as { stock: number } | undefined;
+      if (!v) { res.status(404).json({ error: 'Variação não encontrada.' }); return; }
+      if (q !== v.stock) {
+        db.prepare('UPDATE product_variants SET stock = ? WHERE product_id = ? AND title = ?').run(q, p.id, variante);
+        const novo = sincronizarTotal(p.id);
+        db.prepare('INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id) VALUES (?, ?, ?, ?, ?, ?)').run(p.id, novo - p.stock, p.stock, novo, `${motivo} (${variante})`, u.id);
+        logAudit({ userId: u.id, userEmail: u.email, action: 'STOCK_SET', entity: 'PRODUCTS', entityId: p.id, details: { name: p.name, variante, de: v.stock, para: q, motivo } });
+      }
+      res.json({ success: true, newStock: q, message: `Estoque de "${p.name}" (${variante}) definido em ${q} unidade(s).` });
+      return;
+    }
     if (q !== p.stock) {
       db.prepare('UPDATE products SET stock = ? WHERE id = ?').run(q, p.id);
       db.prepare('INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id) VALUES (?, ?, ?, ?, ?, ?)').run(p.id, q - p.stock, p.stock, q, motivo, u.id);
@@ -76,6 +91,7 @@ export function registerAdminCatalog(app: Express, painel: (a: Area) => RequestH
     db.exec('BEGIN');
     try {
       db.prepare('DELETE FROM cart_items WHERE product_id = ?').run(id);
+      db.prepare('DELETE FROM product_variants WHERE product_id = ?').run(id);
       db.prepare('DELETE FROM stock_movements WHERE product_id = ?').run(id);
       db.prepare('DELETE FROM products WHERE id = ?').run(id);
       db.exec('COMMIT');

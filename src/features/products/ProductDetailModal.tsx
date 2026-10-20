@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, ShieldCheck, Truck, RefreshCw, ChevronDown, ChevronUp, ShoppingBag, Sparkles } from 'lucide-react';
 import type { Product } from '../../services/api';
 import { useCart } from '../../context/CartContext';
+import { useSite } from '../../context/SiteContext';
 import styles from './ProductDetailModal.module.css';
 
 interface ProductDetailModalProps {
@@ -11,6 +12,7 @@ interface ProductDetailModalProps {
 
 export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps) => {
   const { addItem } = useCart();
+  const { settings } = useSite();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<string>(product?.variants[0] || '');
@@ -19,7 +21,11 @@ export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps
 
   if (!product) return null;
 
-  const currentVariant = selectedVariant || product.variants[0];
+  const temEstoquePorVariante = (product.variant_stock?.length ?? 0) > 0;
+  const estoqueDe = (v: string) => (temEstoquePorVariante ? (product.variant_stock!.find(x => x.title === v)?.stock ?? 0) : product.stock);
+  const currentVariant = selectedVariant || product.variants.find(v => estoqueDe(v) > 0) || product.variants[0];
+  const estoqueAtual = estoqueDe(currentVariant);
+  const limiteFrete = Number(settings.free_shipping_threshold) || 500;
 
   const formatPrice = (val: number) => {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -109,6 +115,9 @@ export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps
                       key={variant}
                       type="button"
                       onClick={() => setSelectedVariant(variant)}
+                      disabled={estoqueDe(variant) <= 0}
+                      title={estoqueDe(variant) <= 0 ? 'Esgotado' : undefined}
+                      style={estoqueDe(variant) <= 0 ? { opacity: 0.4, textDecoration: 'line-through', cursor: 'not-allowed' } : undefined}
                       className={`${styles.variantPill} ${currentVariant === variant ? styles.variantPillActive : ''}`}
                     >
                       {variant}
@@ -122,7 +131,7 @@ export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps
             <div className={styles.stockNotice}>
               <span className={styles.stockDot} />
               <span>
-                {product.stock > 5 ? 'Disponível em estoque • Envio imediato' : `Restam apenas ${product.stock} unidades disponíveis`}
+                {estoqueAtual <= 0 ? 'Esgotado' : estoqueAtual > 5 ? 'Disponível em estoque • Envio imediato' : `Restam apenas ${estoqueAtual} unidades disponíveis`}
               </span>
             </div>
 
@@ -130,7 +139,7 @@ export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps
             <button
               onClick={handleAddToCart}
               className={`btn-primary ${styles.addToCartBtn}`}
-              disabled={isAdding || product.stock <= 0}
+              disabled={isAdding || estoqueAtual <= 0}
               id="product-add-to-cart-btn"
             >
               <ShoppingBag size={18} />
@@ -141,7 +150,7 @@ export const ProductDetailModal = ({ product, onClose }: ProductDetailModalProps
             <div className={styles.valueProps}>
               <div className={styles.valueItem}>
                 <Truck size={16} color="#B89758" />
-                <span>Frete Cortesia acima de R$ 500</span>
+                <span>Frete Cortesia acima de {formatPrice(limiteFrete)}</span>
               </div>
               <div className={styles.valueItem}>
                 <ShieldCheck size={16} color="#B89758" />

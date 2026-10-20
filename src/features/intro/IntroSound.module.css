@@ -1,0 +1,51 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: splashOut 1.4s ease 3.2s forwards;
+}
+.splashLogo {
+  width: min(42vw, 300px);
+  height: auto;
+  opacity: 0;
+  animation: logoIn 1.8s ease 0.6s forwards;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+@keyframes logoIn {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes splashOut {
+  to { opacity: 0; visibility: hidden; }
+}
+.toggle {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 900;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(184, 151, 88, 0.45);
+  background: rgba(250, 247, 243, 0.82);
+  backdrop-filter: blur(6px);
+  color: #8a6f3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toggle:hover { opacity: 1; transform: scale(1.05); }
+.toggle:focus-visible { outline: 2px solid #b89758; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .splash { animation-duration: 0.01s; animation-delay: 1.2s; }
+  .splashLogo { animation-duration: 0.01s; animation-delay: 0s; opacity: 1; }
+}
