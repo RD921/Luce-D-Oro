@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Sparkles, Truck, Gem } from 'lucide-react';
-import { api, type Product } from '../../services/api';
-import { ProductCard } from '../catalog/ProductCard';
+import type { Product } from '../../services/api';
 import { useSite } from '../../context/SiteContext';
 import styles from './HomeView.module.css';
 
@@ -10,8 +8,7 @@ interface HomeViewProps {
   onSelectProduct: (product: Product) => void;
 }
 
-export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps) => {
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
   const { categories, c, heroBanner } = useSite();
 
   // Faixa principal: o primeiro banner ativo do painel (Banners). Sem banner, mostra o texto original.
@@ -29,13 +26,6 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
     else if (link.startsWith('#') && link.length > 1) onNavigateCategory(link.slice(1).toLowerCase());
     else onNavigateCategory(categories[0]?.slug || 'pulseiras');
   };
-
-  useEffect(() => {
-    api.catalog
-      .getProducts({ featured: true })
-      .then((data) => setFeaturedProducts(data.slice(0, 3)))
-      .catch(() => setFeaturedProducts([]));
-  }, []);
 
   return (
     <div className={styles.homeContainer}>
@@ -115,29 +105,6 @@ export const HomeView = ({ onNavigateCategory, onSelectProduct }: HomeViewProps)
                   <span className={styles.collectionLink}>Conferir produto <ArrowRight size={13} strokeWidth={1.2} /></span>
                 </span>
               </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SEÇÃO 3: PRODUTOS EM DESTAQUE */}
-      <section className={styles.featuredSection}>
-        <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionCategoryTag}>{c('featured_tag')}</span>
-            <h2 className={styles.sectionTitle}>{c('featured_title')}</h2>
-            <p className={styles.sectionDesc}>
-              Uma curadoria de peças que sintetizam o ápice do design refinado e da excelência artesanal.
-            </p>
-          </div>
-
-          <div className={styles.featuredGrid}>
-            {featuredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onSelect={onSelectProduct}
-              />
             ))}
           </div>
         </div>

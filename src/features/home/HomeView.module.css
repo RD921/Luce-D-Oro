@@ -534,7 +534,7 @@
 
 /* ===== REDESENHO EDITORIAL (home) ===== */
 .eyebrow { display:block; font-family:var(--font-sans); font-size:.68rem; letter-spacing:.28em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:1.1rem; }
-.heroSection { position:relative; min-height:min(72vh,620px); display:flex; align-items:center; background-size:cover; background-position:center right; background-color:#efe9df; border-bottom:none; overflow:hidden; }
+.heroSection { position:relative; min-height:calc(100vh - var(--header-height)); min-height:calc(100svh - var(--header-height)); display:flex; align-items:center; background-size:cover; background-position:center right; background-color:#efe9df; border-bottom:none; overflow:hidden; }
 .heroShade { position:absolute; inset:0; background:linear-gradient(90deg, rgba(244,239,231,.96) 0%, rgba(244,239,231,.82) 38%, rgba(244,239,231,0) 72%); }
 .heroSection .heroContent { position:relative; z-index:2; max-width:460px; padding:4rem 0; }
 .heroTitle { font-family:var(--font-serif); font-weight:500; font-size:clamp(2.2rem,4.4vw,3.4rem); line-height:1.08; letter-spacing:-.01em; color:var(--text-primary); margin:0 0 1.4rem; }

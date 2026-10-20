@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, ShieldCheck, Award, Lock, Sparkles, Check } from 'lucide-react';
+import { ArrowRight, Award, Sparkles, Check } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useSite } from '../../context/SiteContext';
 import styles from './Footer.module.css';
@@ -128,23 +128,6 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div className={styles.bottomBar}>
-            <p className={styles.copyright}>
-              © {new Date().getFullYear()} Luce D'Oro Joalheria Contemporânea. Todos os direitos reservados. CNPJ {contato.cnpj}.
-            </p>
-
-            <div className={styles.securityBadges}>
-              <div className={styles.secItem}>
-                <Lock size={13} color="#B89758" />
-                <span>SSL 256 bits</span>
-              </div>
-              <div className={styles.secItem}>
-                <ShieldCheck size={13} color="#B89758" />
-                <span>Pagamento Seguro</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </footer>
