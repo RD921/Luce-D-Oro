@@ -66,7 +66,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = Object.fromEntries(CONTE
 
 // Dados de contato do rodapé vêm de "Configurações" (loja). Estes são os padrões se nada foi preenchido.
 export const CONTATO_PADRAO = {
-  email: 'contato@cddeouro.com.br',
-  whatsapp: '(11) 98765-4321',
+  email: 'rodrigoarrezzi@icloud.com',
+  whatsapp: '+55 (27) 99505-5702',
   cnpj: '48.912.304/0001-92',
 };

@@ -462,11 +462,16 @@ function seedData() {
     insertSetting.run('origin_cep', '01419-001');
     insertSetting.run('free_shipping_threshold', '500.00');
     insertSetting.run('announcement_banner', 'Frete cortesia para compras acima de R$ 500 para todo o Brasil');
-    insertSetting.run('contact_email', 'contato@cddeouro.com.br');
+    insertSetting.run('contact_email', 'rodrigoarrezzi@icloud.com');
     insertSetting.run('contact_phone', '+55 (11) 3088-2490');
-    insertSetting.run('contact_whatsapp', '+55 (11) 98765-4321');
-    insertSetting.run('instagram', '@cddeouro.oficial');
+    insertSetting.run('contact_whatsapp', '+55 (27) 99505-5702');
+    insertSetting.run('instagram', '@lucedorojoalheria');
   }
+  // Troca os dados de exemplo antigos pelos contatos reais (só se ainda estiverem com o valor de exemplo).
+  const trocaContato = db.prepare('UPDATE system_settings SET value = ? WHERE key = ? AND value = ?');
+  trocaContato.run('rodrigoarrezzi@icloud.com', 'contact_email', 'contato@cddeouro.com.br');
+  trocaContato.run('+55 (27) 99505-5702', 'contact_whatsapp', '+55 (11) 98765-4321');
+  trocaContato.run('@lucedorojoalheria', 'instagram', '@cddeouro.oficial');
 
   // Banners
   const bannerCount = (db.prepare('SELECT COUNT(*) as count FROM banners').get() as { count: number }).count;

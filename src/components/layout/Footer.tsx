@@ -8,11 +8,16 @@ interface FooterProps {
   onNavigate: (view: string, param?: string) => void;
 }
 
-export const Footer = ({ onNavigate }: FooterProps) => {
+const soDigitos = (t: string) => {
+  const d = t.replace(/\D/g, '');
+  return d.length <= 11 ? `55${d}` : d; // sem DDI: assume Brasil
+};
+
+export const Footer = (_props: FooterProps) => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const { showToast } = useToast();
-  const { categories, c, contato } = useSite();
+  const { c, contato } = useSite();
 
   const handleNewsletter = (e: FormEvent) => {
     e.preventDefault();
@@ -75,55 +80,42 @@ export const Footer = ({ onNavigate }: FooterProps) => {
                 <img src="/images/logo-crop.png" alt="Luce D'Oro" className={styles.footerLogoImg} />
                 <span className={styles.brandName}>LUCE D'ORO</span>
               </div>
-              <p className={styles.brandBio}>
-                {c('footer_bio')}
-              </p>
               <div className={styles.certBadge}>
                 <Award size={15} color="#B89758" />
                 <span>Garantia Vitalícia do Teor do Ouro</span>
               </div>
             </div>
 
-            {/* Column 2: Coleções */}
-            <div className={styles.linkCol}>
-              <h4 className={styles.colTitle}>Coleções</h4>
-              <ul className={styles.linkList}>
-                {categories.map((cat) => (
-                  <li key={cat.id}>
-                    <button onClick={() => onNavigate('category', cat.slug)} className={styles.footerLink}>
-                      {cat.name}
-                    </button>
-                  </li>
-                ))}
-                <li>
-                  <button onClick={() => onNavigate('home')} className={styles.footerLink}>
-                    Destaques Editoriais
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 3: Atendimento & Segurança */}
+            {/* Atendimento */}
             <div className={styles.linkCol}>
               <h4 className={styles.colTitle}>Atendimento</h4>
               <ul className={styles.linkList}>
-                <li><span className={styles.footerStatic}>Concierge: {contato.email}</span></li>
-                <li><span className={styles.footerStatic}>WhatsApp: {contato.whatsapp}</span></li>
+                <li>
+                  <a className={styles.footerLink} href={`mailto:${contato.email}`}>Concierge: {contato.email}</a>
+                </li>
+                <li>
+                  <a className={styles.footerLink} href={`https://wa.me/${soDigitos(contato.whatsapp)}`} target="_blank" rel="noopener noreferrer">
+                    WhatsApp: {contato.whatsapp}
+                  </a>
+                </li>
                 <li><span className={styles.footerStatic}>{c('footer_hours')}</span></li>
-                {contato.instagram && <li><span className={styles.footerStatic}>Instagram: {contato.instagram}</span></li>}
+                {contato.instagram && (
+                  <li>
+                    <a className={styles.footerLink} href={`https://instagram.com/${contato.instagram.replace(/^@/, '').trim()}`} target="_blank" rel="noopener noreferrer">
+                      Instagram: {contato.instagram}
+                    </a>
+                  </li>
+                )}
                 {contato.endereco && <li><span className={styles.footerStatic}>{contato.endereco}</span></li>}
-                <li><span className={styles.footerStatic}>{c('footer_extra')}</span></li>
               </ul>
             </div>
 
-            {/* Column 4: Institucional & Transparência */}
+            {/* Institucional */}
             <div className={styles.linkCol}>
               <h4 className={styles.colTitle}>Institucional</h4>
               <ul className={styles.linkList}>
-                <li><span className={styles.footerStatic}>{c('footer_inst1')}</span></li>
-                <li><span className={styles.footerStatic}>{c('footer_inst2')}</span></li>
-                <li><span className={styles.footerStatic}>{c('footer_inst3')}</span></li>
                 <li><span className={styles.footerStatic}>{c('footer_inst4')}</span></li>
+                <li><span className={styles.footerStatic}>{c('footer_extra')}</span></li>
               </ul>
             </div>
           </div>
