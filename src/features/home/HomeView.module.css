@@ -555,7 +555,7 @@
 .trustCell + .trustCell { border-left:1px solid rgba(26,26,26,.14); }
 .trustCell h3 { font-family:var(--font-sans); font-size:.64rem; font-weight:500; letter-spacing:.2em; text-transform:uppercase; margin:.9rem 0 .5rem; }
 .trustCell p { font-size:.74rem; line-height:1.6; color:var(--text-secondary); margin:0 auto; max-width:190px; }
-.collectionsSection { background:#f4efe7; padding:1rem 0 clamp(3rem,6vw,5rem); }
+.collectionsSection { background:#f4efe7; padding:0 0 clamp(3rem,6vw,5rem); }
 .collectionsHead { margin-bottom:1.6rem; }
 .collectionsTitle { font-family:var(--font-serif); font-weight:500; font-size:clamp(1.7rem,3vw,2.3rem); margin:0; }
 .collectionsGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:1rem; }

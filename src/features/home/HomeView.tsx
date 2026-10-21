@@ -69,12 +69,6 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
       {/* COLEÇÕES */}
       <section className={styles.collectionsSection}>
         <div className="container">
-          <div className={styles.collectionsHead}>
-            <div>
-              <span className={styles.eyebrow}>{c('collections_tag')}</span>
-              <h2 className={styles.collectionsTitle}>{c('collections_title')}</h2>
-            </div>
-          </div>
           <div className={styles.collectionsGrid}>
             {categories.map((cat) => (
               <button key={cat.id} className={styles.collectionCard} onClick={() => onNavigateCategory(cat.slug)}>
