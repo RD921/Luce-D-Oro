@@ -10,9 +10,14 @@ const quem = (req: Request): Usuario => (req as unknown as { user: Usuario }).us
 //   'rw' = pode ver e alterar   'r' = só ver
 // O proprietário sempre pode tudo. Configurações, Auditoria e Equipe são SÓ do proprietário.
 // ---------------------------------------------------------------------------
-export type Area = 'dashboard' | 'produtos' | 'categorias' | 'estoque' | 'pedidos' | 'clientes' | 'banners' | 'conteudo' | 'cupons' | 'uploads' | 'entrega';
+export type Area = 'dashboard' | 'produtos' | 'categorias' | 'estoque' | 'pedidos' | 'clientes' | 'banners' | 'conteudo' | 'cupons' | 'uploads' | 'entrega' | 'configuracoes' | 'pagamento' | 'auditoria' | 'arquitetura';
 
 export const PAPEIS: Record<string, { label: string; descricao: string; areas: Partial<Record<Area, 'r' | 'rw'>> }> = {
+  dev: {
+    label: 'Desenvolvedor',
+    descricao: 'Acesso técnico total: loja, Configurações, Arquitetura, Pagamento e Auditoria. Só não gerencia a Equipe.',
+    areas: { dashboard: 'rw', produtos: 'rw', categorias: 'rw', estoque: 'rw', pedidos: 'rw', clientes: 'rw', banners: 'rw', conteudo: 'rw', cupons: 'rw', uploads: 'rw', entrega: 'rw', configuracoes: 'rw', pagamento: 'rw', auditoria: 'r', arquitetura: 'rw' },
+  },
   gerente: {
     label: 'Gerente',
     descricao: 'Cuida da loja toda, menos Configurações, Pagamento, Auditoria e Equipe.',

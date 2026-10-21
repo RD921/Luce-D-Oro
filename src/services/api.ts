@@ -556,7 +556,22 @@ export const api = {
     },
 
     getAuditLogs: () => request<AuditLog[]>('/api/admin/audit-logs'),
+    getArchitecture: () => request<ArchitectureOverview>('/api/admin/architecture/overview'),
 
     getAlerts: () => request<AdminAlert[]>('/api/admin/alerts'),
   },
 };
+
+export interface ArchitectureOverview {
+  geradoEm: string;
+  site: { id: string; nome: string; dominio: string | null; tecnologia: string; ambiente: string; estadoConexao: string; armazenamento: string; publicacao: string };
+  contagens: Record<string, number>;
+  usuariosPorPapel: Array<{ role: string; n: number }>;
+  armazenamento: { arquivos: number; bytes: number; bancoBytes: number; backups: number };
+  servidor: { node: string; plataforma: string; uptimeSegundos: number; memoriaMB: number };
+  verificacoes: Array<{ id: string; titulo: string; estado: 'ok' | 'falha' | 'nao_verificado' | 'atencao'; detalhe: string }>;
+  papeis: Array<{ id: string; label: string; descricao: string; areas: Record<string, string> | 'todas' }>;
+  seguranca: { tentativasNegadas7dias: number };
+  eventosRecentes: Array<{ id: number; user_email: string | null; action: string; entity: string; entity_id: string | null; created_at: string }>;
+  fases: Array<{ n: number; titulo: string; pronta: boolean }>;
+}

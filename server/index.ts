@@ -15,6 +15,7 @@ import { registerAdminExtras } from './adminExtras.js';
 import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
 import { registerAdminCommerce, ESTOQUE_SQL, temVariantes, estoqueDaVariante, baixarEstoque, variantesDe, resolverEntrega, resolverPagamento, limiteFreteGratis } from './adminCommerce.js';
+import { registerAdminArchitecture } from './adminArchitecture.js';
 import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
@@ -859,6 +860,7 @@ registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
 registerAdminCatalog(app, painel);
 registerAdminCommerce(app, painel, ownerAuthMiddleware as any);
+registerAdminArchitecture(app, painel);
 
 // 1. Admin Dashboard Overview
 app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
@@ -1388,7 +1390,7 @@ app.delete('/api/admin/banners/:id', painel('banners'), (req: AuthenticatedReque
 });
 
 // 6. Admin Settings
-app.get('/api/admin/settings', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/settings', painel('configuracoes'), (_req: AuthenticatedRequest, res: Response) => {
   const rows = db.prepare('SELECT key, value FROM system_settings').all() as Array<{ key: string; value: string }>;
   const settings: Record<string, string> = {};
   rows.forEach((r) => {
@@ -1397,7 +1399,7 @@ app.get('/api/admin/settings', ownerAuthMiddleware, (_req: AuthenticatedRequest,
   res.json(settings);
 });
 
-app.put('/api/admin/settings', ownerAuthMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.put('/api/admin/settings', painel('configuracoes'), (req: AuthenticatedRequest, res: Response) => {
   const updates = req.body as Record<string, string>;
 
   const upsert = db.prepare(`
@@ -1441,7 +1443,7 @@ app.get('/api/admin/customers', painel('clientes'), (_req: AuthenticatedRequest,
 });
 
 // 9. Admin Audit Logs
-app.get('/api/admin/audit-logs', ownerAuthMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+app.get('/api/admin/audit-logs', painel('auditoria'), (_req: AuthenticatedRequest, res: Response) => {
   const logs = db.prepare('SELECT * FROM admin_audit_logs ORDER BY created_at DESC LIMIT 60').all() as any[];
   const parsed = logs.map((l) => ({
     ...l,

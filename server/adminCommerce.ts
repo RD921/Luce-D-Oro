@@ -217,7 +217,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
   });
 
   // ---------- Pagamento (somente o proprietário) ----------
-  app.get('/api/admin/payment-methods', ownerOnly, (_req: Request, res: Response) => {
+  app.get('/api/admin/payment-methods', painel('pagamento'), (_req: Request, res: Response) => {
     res.json(db.prepare('SELECT * FROM payment_methods ORDER BY display_order, name').all());
   });
 
@@ -234,7 +234,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     return { dados: d };
   }
 
-  app.post('/api/admin/payment-methods', ownerOnly, (req: Request, res: Response) => {
+  app.post('/api/admin/payment-methods', painel('pagamento'), (req: Request, res: Response) => {
     const { erro, dados } = lerPagamento(req.body || {}, false);
     if (erro || !dados) { res.status(400).json({ error: erro }); return; }
     if (dados.kind !== 'card' && (dados.max_installments ?? 1) !== 1) dados.max_installments = 1;
@@ -248,7 +248,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     res.status(201).json({ success: true, id, message: 'Forma de pagamento criada.' });
   });
 
-  app.put('/api/admin/payment-methods/:id', ownerOnly, (req: Request, res: Response) => {
+  app.put('/api/admin/payment-methods/:id', painel('pagamento'), (req: Request, res: Response) => {
     const id = String(req.params.id);
     const atual = db.prepare('SELECT * FROM payment_methods WHERE id = ?').get(id) as unknown as Pagamento | undefined;
     if (!atual) { res.status(404).json({ error: 'Forma de pagamento não encontrada.' }); return; }
@@ -263,7 +263,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     res.json({ success: true, message: 'Forma de pagamento atualizada.' });
   });
 
-  app.delete('/api/admin/payment-methods/:id', ownerOnly, (req: Request, res: Response) => {
+  app.delete('/api/admin/payment-methods/:id', painel('pagamento'), (req: Request, res: Response) => {
     const id = String(req.params.id);
     const m = db.prepare('SELECT name FROM payment_methods WHERE id = ?').get(id) as { name: string } | undefined;
     if (!m) { res.status(404).json({ error: 'Forma de pagamento não encontrada.' }); return; }
