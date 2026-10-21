@@ -84,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, pass: string) => {
     const res = await api.auth.login(email, pass);
     setUser(res.user);
+    await refreshUser(); // traz as permissões do painel (isStaff/areas) sem precisar recarregar
     closeAuthModal();
     if (res.user.role === 'owner' && res.user.email.toLowerCase() === 'rodrigoarrezzi@icloud.com') {
       showToast(`Bem-vindo, Rodrigo Arrezzi! Central de Comando autorizada.`, 'success');

@@ -192,6 +192,9 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isOwner: user.role === 'owner' && user.email.toLowerCase() === AUTHORIZED_OWNER.email.toLowerCase(),
+      isStaff: Object.keys(areasDoPapel(user.role)).length > 0,
+      areas: areasDoPapel(user.role),
     },
   });
 });
