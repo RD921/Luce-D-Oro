@@ -1495,5 +1495,9 @@ app.get('/api/admin/alerts', painel('dashboard'), (_req: AuthenticatedRequest, r
 app.listen(PORT, () => {
   console.log(`[Luce D'Oro API] Server running on http://localhost:${PORT}`);
   console.log(`[Luce D'Oro Security] Owner Authorized: ${AUTHORIZED_OWNER.name} <${AUTHORIZED_OWNER.email}>`);
-  console.log(`[Luce D'Oro Security] Owner Setup Key: ${getOrCreateOwnerSetupKey()}`);
+  // A chave só é exibida enquanto ainda não foi usada (cadastro do dono pendente).
+  const chave = getOrCreateOwnerSetupKey();
+  const usada = db.prepare('SELECT is_used FROM owner_setup_tokens WHERE token = ?').get(chave) as { is_used: number } | undefined;
+  if (!usada || usada.is_used !== 1) console.log(`[Luce D'Oro Security] Owner Setup Key: ${chave}`);
+  else console.log("[Luce D'Oro Security] Cadastro do dono já concluído.");
 });

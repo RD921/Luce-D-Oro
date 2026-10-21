@@ -292,7 +292,8 @@ function seedData() {
 
   // Check if default users exist
   const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
-  if (userCount === 0) {
+  // Contas de demonstração (senhas públicas no código): só em desenvolvimento, nunca em produção.
+  if (userCount === 0 && process.env.NODE_ENV !== 'production') {
     const insertUser = db.prepare('INSERT INTO users (name, email, password_hash, salt, role, is_verified) VALUES (?, ?, ?, ?, ?, ?)');
     
     // Helena Vasconcelos: cliente@cddeouro.com.br / Senha@123
