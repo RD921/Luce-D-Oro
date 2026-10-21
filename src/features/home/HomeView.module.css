@@ -549,7 +549,7 @@
 .processImage img { width:100%; height:100%; object-fit:cover; display:block; }
 .processImage::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg, rgba(0,0,0,.45), rgba(0,0,0,0) 45%); }
 .processCaption { position:absolute; right:1.4rem; bottom:1.1rem; z-index:2; color:#fff; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; }
-.trustStrip { background:#f4efe7; padding:1rem 0 clamp(2.5rem,5vw,3.5rem); }
+.trustStrip { background:#f4efe7; padding:clamp(2rem,4vw,3rem) 0; border-top:1px solid rgba(26,26,26,.08); }
 .trustRow { display:grid; grid-template-columns:repeat(4,1fr); }
 .trustCell { text-align:center; padding:.6rem 1.4rem; color:var(--text-primary); }
 .trustCell + .trustCell { border-left:1px solid rgba(26,26,26,.14); }

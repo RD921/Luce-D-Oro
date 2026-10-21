@@ -66,26 +66,6 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
         </div>
       </section>
 
-      {/* FAIXA DE CONFIANÇA */}
-      <section className={styles.trustStrip}>
-        <div className="container">
-          <div className={styles.trustRow}>
-            {[
-              { Icon: Gem, t: 'trust1_title', d: 'trust1_desc' },
-              { Icon: ShieldCheck, t: 'trust2_title', d: 'trust2_desc' },
-              { Icon: Truck, t: 'trust3_title', d: 'trust3_desc' },
-              { Icon: Sparkles, t: 'trust4_title', d: 'trust4_desc' },
-            ].map(({ Icon, t, d }) => (
-              <div key={t} className={styles.trustCell}>
-                <Icon size={22} strokeWidth={1.2} />
-                <h3>{c(t)}</h3>
-                <p>{c(d)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* COLEÇÕES */}
       <section className={styles.collectionsSection}>
         <div className="container">
@@ -130,6 +110,26 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
         </div>
       </section>
 
+
+      {/* FAIXA DE CONFIANÇA */}
+      <section className={styles.trustStrip}>
+        <div className="container">
+          <div className={styles.trustRow}>
+            {[
+              { Icon: Gem, t: 'trust1_title', d: 'trust1_desc' },
+              { Icon: ShieldCheck, t: 'trust2_title', d: 'trust2_desc' },
+              { Icon: Truck, t: 'trust3_title', d: 'trust3_desc' },
+              { Icon: Sparkles, t: 'trust4_title', d: 'trust4_desc' },
+            ].map(({ Icon, t, d }) => (
+              <div key={t} className={styles.trustCell}>
+                <Icon size={22} strokeWidth={1.2} />
+                <h3>{c(t)}</h3>
+                <p>{c(d)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
