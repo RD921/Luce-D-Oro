@@ -95,7 +95,8 @@
 
 .footerGrid {
   display: grid;
-  grid-template-columns: 1.4fr 1.2fr 1fr;
+  grid-template-columns: 1fr auto;
+  justify-content: space-between;
   gap: 2rem;
   margin-bottom: 0;
 }
@@ -235,3 +236,6 @@
     align-items: flex-start;
   }
 }
+
+/* Rodapé encostado nas laterais */
+.mainFooter :global(.container) { max-width: none; padding-left: clamp(1rem, 2.5vw, 2rem); padding-right: clamp(1rem, 2.5vw, 2rem); }

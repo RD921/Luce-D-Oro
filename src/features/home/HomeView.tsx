@@ -66,24 +66,6 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
         </div>
       </section>
 
-      {/* COLEÇÕES */}
-      <section className={styles.collectionsSection}>
-        <div className="container">
-          <div className={styles.collectionsGrid}>
-            {categories.map((cat) => (
-              <button key={cat.id} className={styles.collectionCard} onClick={() => onNavigateCategory(cat.slug)}>
-                <img src={cat.image_url || '/images/hero-editorial.jpg'} alt={cat.name} />
-                <span className={styles.collectionShade} />
-                <span className={styles.collectionInfo}>
-                  <span className={styles.collectionName}>{cat.name}</span>
-                  <span className={styles.collectionLink}>Conferir produto <ArrowRight size={13} strokeWidth={1.2} /></span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* SEÇÃO 5: HISTÓRIA DA MARCA */}
       <section className={styles.brandStorySection}>
         <div className="container">
