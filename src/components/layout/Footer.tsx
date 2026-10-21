@@ -72,7 +72,7 @@ export const Footer = ({ onNavigate }: FooterProps) => {
             {/* Column 1: Brand info */}
             <div className={styles.brandCol}>
               <div className={styles.brandLogo}>
-                <img src="/images/logo-header.png" alt="Luce D'Oro" className={styles.footerLogoImg} />
+                <img src="/images/logo-crop.png" alt="Luce D'Oro" className={styles.footerLogoImg} />
                 <span className={styles.brandName}>LUCE D'ORO</span>
               </div>
               <p className={styles.brandBio}>

@@ -1,13 +1,13 @@
 .footer {
   background-color: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
-  margin-top: 4rem;
+  margin-top: 2rem;
 }
 
 .newsletterSection {
   background-color: var(--bg-elevated);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 4rem 0;
+  padding: 2rem 0;
 }
 
 .newsletterCard {
@@ -35,7 +35,7 @@
 
 .newsletterTitle {
   font-family: var(--font-serif);
-  font-size: 1.85rem;
+  font-size: 1.4rem;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.25;
@@ -90,14 +90,14 @@
 
 /* Main Footer */
 .mainFooter {
-  padding: 4.5rem 0 2rem 0;
+  padding: 2.2rem 0 1.4rem 0;
 }
 
 .footerGrid {
   display: grid;
   grid-template-columns: 2fr 1fr 1.2fr 1fr;
-  gap: 3rem;
-  margin-bottom: 4rem;
+  gap: 2rem;
+  margin-bottom: 0;
 }
 
 .brandCol {
@@ -113,7 +113,7 @@
 }
 
 .footerLogoImg {
-  height: 40px;
+  height: 46px;
   width: auto;
   object-fit: contain;
   display: block;

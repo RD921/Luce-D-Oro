@@ -106,9 +106,9 @@
 }
 
 .brandLogoImg {
-  height: 92px;
+  height: 62px;
   width: auto;
-  max-width: 240px;
+  max-width: 260px;
   object-fit: contain;
   display: block;
 }
