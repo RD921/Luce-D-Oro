@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
               aria-label="Luce D'Oro - Página Inicial"
             >
               <img
-                src={c('logo_header')}
+                data-edit-key="logo_header" src={c('logo_header')}
                 alt="Luce D'Oro"
                 className={styles.brandLogoImg}
               />

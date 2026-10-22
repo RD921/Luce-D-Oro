@@ -1,4 +1,5 @@
 import { IntroSound } from './features/intro/IntroSound';
+import { EditorBridge } from './features/editor/EditorBridge';
 import { useState, useEffect } from 'react';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -97,6 +98,7 @@ function AppContent() {
       />
 
       <IntroSound pausado={adminOpen} />
+      <EditorBridge />
 
       {/* Checkout Modal */}
       <CheckoutModal onOrderSuccess={() => setOrdersModalOpen(true)} />

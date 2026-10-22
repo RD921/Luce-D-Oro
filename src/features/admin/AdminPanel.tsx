@@ -10,6 +10,7 @@ import { useSite } from '../../context/SiteContext';
 import { api, type ArchitectureOverview, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
 import { ArchitectureHome } from './ArchitectureHome';
 import { MediaLibrary, MediaPicker } from './MediaLibrary';
+import { VisualEditor } from './VisualEditor';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -2121,7 +2122,6 @@ function ArchitectureSection({ secao }: { secao: string }) {
     { id: 'sites', nome: 'Sites e clientes' },
     { id: 'acesso', nome: 'Segurança e permissões' },
     { id: 'diag', nome: 'Diagnóstico e logs' },
-    { id: 'editor', nome: 'Editor visual', fase: 4 },
     { id: 'versoes', nome: 'Versões e publicação', fase: 5 },
   ] as const;
   const [d, setD] = useState<ArchitectureOverview | null>(null);
@@ -2133,6 +2133,7 @@ function ArchitectureSection({ secao }: { secao: string }) {
   const tempo = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.floor(s / 60)} min`);
   const atual = SECOES.find(x => x.id === secao);
   if (secao === 'midia') return <MediaLibrary />;
+  if (secao === 'editor') return <VisualEditor />;
 
   return (
     <>

@@ -39,7 +39,7 @@ export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
   const cartoes: Array<{ icon: React.ReactNode; titulo: string; desc: string; abre: () => void; breve?: string }> = [
     { icon: <Monitor size={26} strokeWidth={1.3} />, titulo: 'Visão geral', desc: 'Acompanhe o estado do site, os números da loja e as verificações técnicas.', abre: () => onOpenSection('visao') },
     { icon: <ImageIcon size={26} strokeWidth={1.3} />, titulo: 'Biblioteca de mídia', desc: 'Gerencie imagens, arquivos e recursos visuais.', abre: () => onOpenSection('midia') },
-    { icon: <MousePointer2 size={26} strokeWidth={1.3} />, titulo: 'Editor visual', desc: 'Edite o conteúdo do site de forma simples e intuitiva.', abre: () => onOpenSection('editor'), breve: 'Fase 4' },
+    { icon: <MousePointer2 size={26} strokeWidth={1.3} />, titulo: 'Editor visual', desc: 'Edite o conteúdo do site de forma simples e intuitiva.', abre: () => onOpenSection('editor') },
     { icon: <FileText size={26} strokeWidth={1.3} />, titulo: 'Páginas e conteúdo', desc: 'Organize páginas, seções e textos do site.', abre: () => onNavigate('content') },
     { icon: <RefreshCw size={26} strokeWidth={1.3} />, titulo: 'Versões e publicação', desc: 'Controle rascunhos, histórico e publique alterações.', abre: () => onOpenSection('versoes'), breve: 'Fase 5' },
     { icon: <Users size={26} strokeWidth={1.3} />, titulo: 'Sites e clientes', desc: 'Gerencie múltiplos sites e clientes em um só lugar.', abre: () => onOpenSection('sites') },
@@ -155,7 +155,7 @@ export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
             <div className={styles.archRow}><span>Última atividade</span><span className={styles.archRowMain}>{fmt(d?.ultimaAtividade ?? null)}</span></div>
             <div style={{ display: 'flex', gap: 8, paddingTop: 12, flexWrap: 'wrap' }}>
               <a className={`${styles.btnSmall} ${styles.btnSmallGhost}`} href="/" target="_blank" rel="noopener noreferrer">Abrir site</a>
-              <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} disabled title="O editor visual chega na fase 4" style={{ opacity: 0.55, cursor: 'not-allowed' }}>Editor visual</button>
+              <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => onOpenSection('editor')}>Editor visual</button>
             </div>
           </div>
         </div>

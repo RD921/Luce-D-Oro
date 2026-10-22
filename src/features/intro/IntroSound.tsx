@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import styles from './IntroSound.module.css';
+import { emModoEditor } from '../editor/EditorBridge';
 
 // Tela de abertura: logo sobre fundo preto, mostrada uma vez por sessão. Sem som.
 const CHAVE_SPLASH = 'ld_intro_done';
@@ -7,7 +8,7 @@ const lerSessao = (k: string) => { try { return sessionStorage.getItem(k); } cat
 const gravarSessao = (k: string, v: string) => { try { sessionStorage.setItem(k, v); } catch { /* */ } };
 
 export function IntroSound(_props: { pausado?: boolean }) {
-  const [splash, setSplash] = useState(() => lerSessao(CHAVE_SPLASH) !== '1');
+  const [splash, setSplash] = useState(() => lerSessao(CHAVE_SPLASH) !== '1' && !emModoEditor());
 
   const encerrar = () => {
     document.body.style.overflow = '';

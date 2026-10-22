@@ -119,8 +119,8 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
       fases: [
         { n: 1, titulo: 'Navegação, acesso e diagnóstico', pronta: true },
         { n: 2, titulo: 'Vários clientes e sites', pronta: false },
-        { n: 3, titulo: 'Biblioteca de mídia', pronta: false },
-        { n: 4, titulo: 'Editor visual', pronta: false },
+        { n: 3, titulo: 'Biblioteca de mídia', pronta: true },
+        { n: 4, titulo: 'Editor visual', pronta: true },
         { n: 5, titulo: 'Rascunhos, versões e publicação', pronta: false },
         { n: 6, titulo: 'Auditoria avançada e testes de segurança', pronta: false },
       ],

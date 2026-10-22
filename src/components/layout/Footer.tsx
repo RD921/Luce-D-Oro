@@ -23,7 +23,7 @@ export const Footer = (_props: FooterProps) => {
             {/* Column 1: Brand info */}
             <div className={styles.brandCol}>
               <div className={styles.brandLogo}>
-                <img src={c('logo_footer')} alt="Luce D'Oro" className={styles.footerLogoImg} />
+                <img data-edit-key="logo_footer" src={c('logo_footer')} alt="Luce D'Oro" className={styles.footerLogoImg} />
                 <span className={styles.brandName}>LUCE D'ORO</span>
               </div>
               <div className={styles.certBadge}>
@@ -44,7 +44,7 @@ export const Footer = (_props: FooterProps) => {
                     WhatsApp: {contato.whatsapp}
                   </a>
                 </li>
-                <li><span className={styles.footerStatic}>{c('footer_hours')}</span></li>
+                <li><span className={styles.footerStatic} data-edit-key="footer_hours">{c('footer_hours')}</span></li>
                 {contato.instagram && (
                   <li>
                     <a className={styles.footerLink} href={`https://instagram.com/${contato.instagram.replace(/^@/, '').trim()}`} target="_blank" rel="noopener noreferrer">
