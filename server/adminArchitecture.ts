@@ -42,10 +42,11 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
       for (const r of db.prepare('SELECT key, value FROM system_settings').all() as Array<{ key: string; value: string }>) config[r.key] = r.value;
     } catch { /* sem configurações */ }
 
-    const dbFile = path.resolve(process.cwd(), 'data', 'luce_d_oro.db');
+    const dbFile = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'), 'luce_d_oro.db');
     const dbBytes = fs.existsSync(dbFile) ? fs.statSync(dbFile).size : 0;
     const uploads = tamanhoPasta(UPLOAD_DIR);
     const emProducao = process.env.NODE_ENV === 'production';
+    const configuradoFora = Boolean(process.env.DATA_DIR && process.env.UPLOAD_DIR);
     const hospedagemEfemera = Boolean(process.env.RENDER || process.env.DYNO || process.env.VERCEL || process.env.FLY_APP_NAME);
     const backups = (() => {
       try { return fs.readdirSync(path.dirname(dbFile)).filter((f) => /^backup-.*\.db$/.test(f)).sort(); } catch { return []; }
@@ -64,10 +65,12 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
     verificacoes.push({
       id: 'persistencia',
       titulo: 'Armazenamento persistente',
-      estado: hospedagemEfemera ? 'atencao' : 'nao_verificado',
-      detalhe: hospedagemEfemera
-        ? 'Hospedagem com disco temporário detectada: imagens enviadas e o banco SQLite podem ser apagados a cada novo deploy. É preciso disco persistente ou armazenamento externo.'
-        : 'Não foi possível confirmar se o disco sobrevive a novos deploys. Verifique na sua hospedagem.',
+      estado: configuradoFora ? 'ok' : hospedagemEfemera ? 'atencao' : 'nao_verificado',
+      detalhe: configuradoFora
+        ? `Pastas definidas por variável de ambiente (${[process.env.DATA_DIR && 'DATA_DIR', process.env.UPLOAD_DIR && 'UPLOAD_DIR'].filter(Boolean).join(' e ')}). Confirme na hospedagem que apontam para um disco persistente.`
+        : hospedagemEfemera
+          ? 'Hospedagem com disco temporário detectada: imagens enviadas e o banco SQLite podem ser apagados a cada novo deploy. Defina DATA_DIR e UPLOAD_DIR apontando para um disco persistente.'
+          : 'Não foi possível confirmar se o disco sobrevive a novos deploys. Verifique na sua hospedagem.',
     });
     verificacoes.push({ id: 'dono', titulo: 'Conta do proprietário', estado: donoCadastrado ? 'ok' : 'atencao', detalhe: donoCadastrado ? 'Proprietário cadastrado.' : 'Cadastro do proprietário ainda não concluído.' });
     verificacoes.push({ id: 'backup', titulo: 'Cópias de segurança do banco', estado: backups.length ? 'ok' : 'nao_verificado', detalhe: backups.length ? `Última cópia: ${backups[backups.length - 1]}.` : 'Nenhuma cópia local encontrada. Backups automáticos ainda não foram configurados.' });

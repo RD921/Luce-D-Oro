@@ -221,6 +221,22 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data as T;
 }
 
+export interface MediaItem {
+  id: string; url: string; urlBase: string; nome: string; arquivo: string; mime: string; bytes: number;
+  largura: number | null; altura: number | null; alt: string; categoria: string; enviadoPor: string | null;
+  criadoEm: string; atualizadoEm: string; usos?: number; locais?: string[];
+}
+
+function lerArquivo(file: File): Promise<string> {
+  if (file.size > 8 * 1024 * 1024) return Promise.reject(new Error(`"${file.name}" tem mais de 8 MB.`));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export const api = {
   auth: {
     validateEmail: (email: string) =>
@@ -539,6 +555,25 @@ export const api = {
 
     getInsights: (period = '30d') =>
       request<DashboardInsights>(`/api/admin/dashboard/insights?period=${period}`),
+
+    // ---- Biblioteca de mídia ----
+    mediaCategorias: () => request<Array<{ id: string; nome: string }>>('/api/admin/media/categories'),
+    mediaList: (params: Record<string, string | number>) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v !== undefined).map(([k, v]) => [k, String(v)])).toString();
+      return request<{ itens: MediaItem[]; total: number; pagina: number; porPagina: number }>(`/api/admin/media?${qs}`);
+    },
+    mediaGet: (id: string) => request<MediaItem>(`/api/admin/media/${id}`),
+    mediaUpload: async (file: File, categoria: string, alt = '') => {
+      const data = await lerArquivo(file);
+      return request<MediaItem>('/api/admin/media', { method: 'POST', body: JSON.stringify({ data, name: file.name, category: categoria, alt }) });
+    },
+    mediaUpdate: (id: string, body: { nome?: string; alt?: string; categoria?: string }) =>
+      request<MediaItem>(`/api/admin/media/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    mediaReplace: async (id: string, file: File) => {
+      const data = await lerArquivo(file);
+      return request<MediaItem>(`/api/admin/media/${id}/replace`, { method: 'POST', body: JSON.stringify({ data }) });
+    },
+    mediaDelete: (id: string) => request<{ success: boolean }>(`/api/admin/media/${id}`, { method: 'DELETE' }),
 
     // ---- Upload de imagem (arquivo do computador) ----
     uploadImage: async (file: File) => {

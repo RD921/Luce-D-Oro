@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
 import { api, type ArchitectureOverview, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
 import { ArchitectureHome } from './ArchitectureHome';
+import { MediaLibrary, MediaPicker } from './MediaLibrary';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -100,12 +101,15 @@ function UploadButton({ onUploaded, label = 'Enviar do computador' }: { onUpload
 
 // Campo de imagem: cole um link OU envie um arquivo do computador
 function ImageField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [biblioteca, setBiblioteca] = useState(false);
   return (
     <>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input className={styles.formInput} style={{ flex: 1, minWidth: 180 }} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Cole um link ou envie um arquivo'} />
         <UploadButton onUploaded={onChange} />
+        <button type="button" className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setBiblioteca(true)}><Image size={13} /> Biblioteca</button>
       </div>
+      {biblioteca && <MediaPicker onPick={onChange} onClose={() => setBiblioteca(false)} />}
       {value && <img src={value} alt="" className={styles.bannerPreview} onError={() => {}} />}
     </>
   );
@@ -2117,7 +2121,6 @@ function ArchitectureSection({ secao }: { secao: string }) {
     { id: 'sites', nome: 'Sites e clientes' },
     { id: 'acesso', nome: 'Segurança e permissões' },
     { id: 'diag', nome: 'Diagnóstico e logs' },
-    { id: 'midia', nome: 'Biblioteca de mídia', fase: 3 },
     { id: 'editor', nome: 'Editor visual', fase: 4 },
     { id: 'versoes', nome: 'Versões e publicação', fase: 5 },
   ] as const;
@@ -2129,6 +2132,7 @@ function ArchitectureSection({ secao }: { secao: string }) {
   const mb = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
   const tempo = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.floor(s / 60)} min`);
   const atual = SECOES.find(x => x.id === secao);
+  if (secao === 'midia') return <MediaLibrary />;
 
   return (
     <>

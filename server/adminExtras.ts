@@ -10,7 +10,8 @@ import type { Area } from './adminTeam.js';
 type Owner = { id: number; email: string };
 const dono = (req: Request): Owner => (req as unknown as { user: Owner }).user;
 
-export const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads');
+// Em hospedagem com disco temporário, aponte UPLOAD_DIR para uma pasta de disco persistente.
+export const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : path.resolve(process.cwd(), 'uploads');
 const MAX_BYTES = 6 * 1024 * 1024;
 
 // Descobre o tipo REAL do arquivo pelos primeiros bytes (não confia no nome nem no tipo enviado).
@@ -50,7 +51,7 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
   migrarExtras();
 
   // Arquivos enviados ficam públicos (são fotos da vitrine)
-  app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', index: false, dotfiles: 'deny' }));
+  app.use('/uploads', express.static(UPLOAD_DIR, { index: false, dotfiles: 'deny', setHeaders: (r) => r.setHeader('Cache-Control', 'public, max-age=0, must-revalidate') }));
 
   // ---------- Upload de imagem ----------
   // Corpo: { data: "<base64 ou data:image/...;base64,...>" }

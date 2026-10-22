@@ -12,6 +12,7 @@ import {
   getOrCreateOwnerSetupKey,
 } from './db.js';
 import { registerAdminExtras } from './adminExtras.js';
+import { registerAdminMedia } from './adminMedia.js';
 import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
 import { registerAdminCommerce, ESTOQUE_SQL, temVariantes, estoqueDaVariante, baixarEstoque, variantesDe, resolverEntrega, resolverPagamento, limiteFreteGratis } from './adminCommerce.js';
@@ -30,7 +31,7 @@ app.use(
   })
 );
 // O upload de imagens tem leitor próprio (aceita arquivos maiores), por isso é pulado aqui
-app.use((req, res, next) => (req.path === '/api/admin/uploads' ? next() : express.json()(req, res, next)));
+app.use((req, res, next) => (req.path === '/api/admin/uploads' || req.path.startsWith('/api/admin/media') ? next() : express.json()(req, res, next)));
 app.use(cookieParser());
 
 // Helper to authenticate request via Cookie or Authorization header
@@ -859,6 +860,7 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 // Upload de imagens e categorias (arquivo separado)
 const painel = criarPainel(authMiddleware as any);
 registerAdminExtras(app, painel);
+registerAdminMedia(app, painel);
 registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
 registerAdminCatalog(app, painel);

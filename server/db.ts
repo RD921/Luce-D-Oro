@@ -3,7 +3,8 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const DB_DIR = path.resolve(process.cwd(), 'data');
+// Em hospedagem com disco temporário, aponte DATA_DIR para uma pasta de disco persistente.
+const DB_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
