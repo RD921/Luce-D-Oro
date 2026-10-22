@@ -3,11 +3,12 @@ import {
   LayoutDashboard, Package, ShoppingCart, Archive, Image, Tag, Settings,
   Shield, X, Plus, Edit2, Trash2, Search,
   AlertTriangle, Users, ArrowUpCircle, ArrowDownCircle,
-  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText, CreditCard
+  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText, CreditCard, Bell, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
 import { api, type ArchitectureOverview, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
+import { ArchitectureHome } from './ArchitectureHome';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -36,7 +37,7 @@ export class AdminErrorBoundary extends React.Component<
           <div style={{ fontSize: '1rem', fontWeight: 600 }}>Erro no Painel Administrativo</div>
           <div style={{ fontSize: '0.8rem', color: '#888', maxWidth: 400, textAlign: 'center' }}>{this.state.error}</div>
           <button onClick={this.props.onClose} style={{
-            marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#B89758',
+            marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#9199a4',
             border: 'none', borderRadius: 4, color: '#0F0F0F', fontWeight: 600, cursor: 'pointer'
           }}>Fechar Painel</button>
         </div>
@@ -113,7 +114,7 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 // ============================================================
 // TABS
 // ============================================================
-type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'shipping' | 'payments' | 'team' | 'settings' | 'audit';
+type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'shipping' | 'payments' | 'team' | 'settings' | 'audit' | 'architecture';
 
 // area = nome da área no servidor; owner = só o proprietário vê
 interface Tab { id: TabId; label: string; icon: React.ReactNode; group: string; area?: string; owner?: boolean }
@@ -122,18 +123,28 @@ const TABS: Tab[] = [
   { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={15} />, group: 'Visão Geral', area: 'dashboard' },
   { id: 'products',   label: 'Produtos',     icon: <Package size={15} />,         group: 'Visão Geral', area: 'produtos' },
   { id: 'categories', label: 'Categorias',   icon: <Layers size={15} />,          group: 'Visão Geral', area: 'categorias' },
-  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} />,        group: 'Visão Geral', area: 'conteudo' },
-  { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} />,    group: 'Marketing & Loja', area: 'pedidos' },
+  { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} />,    group: 'Visão Geral', area: 'pedidos' },
+  { id: 'customers',  label: 'Clientes',     icon: <Users size={15} />,           group: 'Visão Geral', area: 'clientes' },
   { id: 'stock',      label: 'Estoque',      icon: <Archive size={15} />,         group: 'Marketing & Loja', area: 'estoque' },
-  { id: 'banners',    label: 'Banners',      icon: <Image size={15} />,           group: 'Sistema', area: 'banners' },
+  { id: 'banners',    label: 'Banners',      icon: <Image size={15} />,           group: 'Marketing & Loja', area: 'banners' },
+  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} />,        group: 'Marketing & Loja', area: 'conteudo' },
   { id: 'coupons',    label: 'Cupons',       icon: <Tag size={15} />,             group: 'Sistema', area: 'cupons' },
-  { id: 'customers',  label: 'Clientes',     icon: <Users size={15} />,           group: 'Sistema', area: 'clientes' },
   { id: 'shipping',   label: 'Entrega',      icon: <Truck size={15} />,           group: 'Sistema', area: 'entrega' },
   { id: 'payments',   label: 'Pagamento',    icon: <CreditCard size={15} />,      group: 'Sistema', area: 'pagamento' },
-  { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
   { id: 'settings',   label: 'Configurações',icon: <Settings size={15} />,        group: 'Sistema', area: 'configuracoes' },
+  { id: 'architecture', label: 'Arquitetura Adm.', icon: <Layers size={15} />,    group: 'Sistema', area: 'arquitetura' },
+  { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
   { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} />,          group: 'Sistema', area: 'auditoria' },
 ];
+
+const SETTINGS_SUB = [
+  { id: 'geral', label: 'Geral' },
+  { id: 'seo', label: 'SEO' },
+  { id: 'integracoes', label: 'Integrações' },
+  { id: 'notificacoes', label: 'Notificações' },
+] as const;
+type SettingsSub = typeof SETTINGS_SUB[number]['id'];
+
 
 // ============================================================
 // MAIN ADMIN PANEL
@@ -146,6 +157,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { user, logout, isOwner } = useAuth();
   const abas = TABS.filter(t => (t.owner ? isOwner : isOwner || Boolean(t.area && user?.areas?.[t.area])));
   const [activeTab, setActiveTab] = useState<TabId>(abas[0]?.id ?? 'dashboard');
+  const [settingsSub, setSettingsSub] = useState<SettingsSub>('geral');
+  const [archSection, setArchSection] = useState<string | null>(null);
+  const [online, setOnline] = useState<boolean | null>(null);
+  const [sino, setSino] = useState(false);
+  const [menuConta, setMenuConta] = useState(false);
+
+  // "Sistema online" vem de uma verificação real do servidor, repetida a cada 30 segundos.
+  useEffect(() => {
+    let vivo = true;
+    const checar = () => fetch('/api/health').then(r => r.ok).catch(() => false).then(ok => { if (vivo) setOnline(ok); });
+    checar();
+    const t = window.setInterval(checar, 30000);
+    return () => { vivo = false; window.clearInterval(t); };
+  }, []);
+  const iniciaisUsuario = (user?.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+  const papelRotulo = isOwner ? 'Proprietário' : user?.role === 'dev' ? 'Desenvolvedor' : 'Equipe';
+  const abrirAba = (id: string) => { setActiveTab(id as TabId); setArchSection(null); };
   const grupos = Array.from(new Set(abas.map(t => t.group)));
 
   const handleLogout = async () => {
@@ -158,11 +186,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       {/* -------- Sidebar -------- */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          <span className={styles.sidebarBrandBadge}>{isOwner ? '⚡ Proprietário' : user?.role === 'dev' ? '🛠 Desenvolvedor' : '👥 Equipe'}</span>
           <span className={styles.sidebarBrandName}>LUCE D'ORO</span>
-          <span className={styles.sidebarOwner}>
-            {user?.name || ''}
-          </span>
+          <span className={styles.sidebarOwner}>{papelRotulo}</span>
         </div>
 
         <nav className={styles.sidebarNav}>
@@ -170,14 +195,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             <div key={g} className={styles.navSection}>
               <div className={styles.navSectionLabel}>{g}</div>
               {abas.filter(t => t.group === g).map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
+                <React.Fragment key={tab.id}>
+                  <button
+                    onClick={() => abrirAba(tab.id)}
+                    className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                    {tab.id === 'settings' && <ChevronDown size={14} style={{ marginLeft: 'auto', transform: activeTab === 'settings' ? 'none' : 'rotate(-90deg)', transition: 'transform 160ms' }} />}
+                  </button>
+                  {tab.id === 'settings' && activeTab === 'settings' && (
+                    <div className={styles.subNav}>
+                      {SETTINGS_SUB.map(sub => (
+                        <button key={sub.id} className={`${styles.subNavItem} ${settingsSub === sub.id ? styles.subNavActive : ''}`} onClick={() => setSettingsSub(sub.id)}>{sub.label}</button>
+                      ))}
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
             </div>
           ))}
@@ -202,9 +236,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             {abas.find(t => t.id === activeTab)?.label}
           </span>
           <div className={styles.topBarRight}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }}>
-              {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+            <span className={styles.sysStatus} title="Resultado de uma verificação real do servidor">
+              <span className={`${styles.dot} ${online ? styles.dotOk : online === false ? styles.dotFail : ''}`} />
+              {online === null ? 'Verificando…' : online ? 'Sistema online' : 'Sem resposta do servidor'}
             </span>
+            <div className={styles.relative}>
+              <button className={styles.iconBtn} aria-label="Notificações" onClick={() => { setSino(v => !v); setMenuConta(false); }}><Bell size={17} strokeWidth={1.4} /></button>
+              {sino && <div className={styles.popover}>Nenhuma notificação. A central de notificações persistente chega na fase 7.</div>}
+            </div>
+            <div className={styles.relative}>
+              <button className={`${styles.iconBtn} ${styles.userChip}`} style={{ width: 'auto', padding: '0 .4rem' }} onClick={() => { setMenuConta(v => !v); setSino(false); }}>
+                <span className={styles.avatar}>{iniciaisUsuario}</span>
+                <span style={{ textAlign: 'left' }}>
+                  <span className={styles.userName} style={{ display: 'block' }}>{user?.name}</span>
+                  <span className={styles.userSub} style={{ display: 'block' }}>{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</span>
+                </span>
+                <ChevronDown size={14} />
+              </button>
+              {menuConta && (
+                <div className={styles.popover} style={{ minWidth: 220 }}>
+                  <div style={{ color: 'var(--adm-text)', marginBottom: 2 }}>{user?.name}</div>
+                  <div style={{ marginBottom: 10 }}>{user?.email} · {papelRotulo}</div>
+                  <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={onClose}>Voltar à loja</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -221,7 +277,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'shipping'   && <ShippingTab />}
           {activeTab === 'payments'   && <PaymentsTab />}
           {activeTab === 'team'       && isOwner && <TeamTab />}
-          {activeTab === 'settings'   && <SettingsSection />}
+          {activeTab === 'settings'   && <SettingsSection sub={settingsSub} />}
+          {activeTab === 'architecture' && (archSection
+            ? <><button className={styles.archBack} onClick={() => setArchSection(null)}>← Voltar para Arquitetura Adm.</button><ArchitectureSection secao={archSection} /></>
+            : <ArchitectureHome online={online} onOpenSection={setArchSection} onNavigate={abrirAba} />)}
           {activeTab === 'audit'      && <AuditTab />}
         </div>
       </main>
@@ -2028,20 +2087,20 @@ function SettingsTab() {
 // ============================================================
 // CONFIGURAÇÕES: Geral | Arquitetura
 // ============================================================
-function SettingsSection() {
-  const { user, isOwner } = useAuth();
-  const veArquitetura = isOwner || Boolean(user?.areas?.arquitetura);
-  const [aba, setAba] = useState<'geral' | 'arquitetura'>('geral');
+function SettingsSection({ sub }: { sub: SettingsSub }) {
+  if (sub === 'geral') return <SettingsTab />;
+  const info: Record<string, { titulo: string; texto: string }> = {
+    seo: { titulo: 'SEO', texto: 'Título, descrição, URL canônica, imagem de compartilhamento e sitemap por página. Hoje só a descrição geral do site pode ser editada, em Geral.' },
+    integracoes: { titulo: 'Integrações', texto: 'Estado e teste de conexão de pagamentos, entrega e analytics. Nenhuma integração externa está conectada hoje.' },
+    notificacoes: { titulo: 'Notificações', texto: 'Central persistente de avisos administrativos (publicação, mídia, segurança, integrações).' },
+  };
+  const i = info[sub];
   return (
-    <>
-      {veArquitetura && (
-        <div className={styles.filterRow} style={{ marginBottom: '1rem' }}>
-          <button className={`${styles.btnSmall} ${aba === 'geral' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAba('geral')}>Geral</button>
-          <button className={`${styles.btnSmall} ${aba === 'arquitetura' ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setAba('arquitetura')}>Arquitetura</button>
-        </div>
-      )}
-      {aba === 'geral' ? <SettingsTab /> : <ArchitectureTab />}
-    </>
+    <div className={styles.tableWrapper} style={{ padding: '1.5rem' }}>
+      <div className={styles.sectionTitle}>{i.titulo}</div>
+      <p style={{ color: 'var(--adm-text-muted)', marginTop: '.5rem', lineHeight: 1.7 }}>{i.texto}</p>
+      <p style={{ color: 'var(--adm-text-dim)', fontSize: '.78rem' }}>Ainda não disponível: será entregue na fase 7 do plano, com funcionamento real.</p>
+    </div>
   );
 }
 
@@ -2052,7 +2111,7 @@ const ESTADO_INFO: Record<string, { rotulo: string; cor: string }> = {
   nao_verificado: { rotulo: 'Não verificado', cor: 'var(--adm-text-muted)' },
 };
 
-function ArchitectureTab() {
+function ArchitectureSection({ secao }: { secao: string }) {
   const SECOES = [
     { id: 'visao', nome: 'Visão geral' },
     { id: 'sites', nome: 'Sites e clientes' },
@@ -2062,7 +2121,6 @@ function ArchitectureTab() {
     { id: 'editor', nome: 'Editor visual', fase: 4 },
     { id: 'versoes', nome: 'Versões e publicação', fase: 5 },
   ] as const;
-  const [secao, setSecao] = useState<string>('visao');
   const [d, setD] = useState<ArchitectureOverview | null>(null);
   const [erro, setErro] = useState('');
   const carregar = () => { setErro(''); api.admin.getArchitecture().then(setD).catch((e: any) => setErro(e.message || 'Não foi possível carregar.')); };
@@ -2074,14 +2132,6 @@ function ArchitectureTab() {
 
   return (
     <>
-      <div className={styles.filterRow} style={{ marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {SECOES.map(x => (
-          <button key={x.id} className={`${styles.btnSmall} ${secao === x.id ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setSecao(x.id)}>
-            {x.nome}{'fase' in x ? ' (em breve)' : ''}
-          </button>
-        ))}
-      </div>
-
       {atual && 'fase' in atual && (
         <div className={styles.tableWrapper} style={{ padding: '1.5rem' }}>
           <div className={styles.sectionTitle}>{atual.nome}</div>

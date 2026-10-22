@@ -93,6 +93,7 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
         armazenamento: 'Disco local do servidor (pasta uploads/)',
         publicacao: 'Edições do painel valem imediatamente (rascunhos e versões: fase 5)',
       },
+      ultimaAtividade: ((): string | null => { try { return (db.prepare('SELECT created_at FROM admin_audit_logs ORDER BY id DESC LIMIT 1').get() as { created_at: string } | undefined)?.created_at ?? null; } catch { return null; } })(),
       contagens: {
         produtos: n('SELECT COUNT(*) AS n FROM products'),
         categorias: n('SELECT COUNT(*) AS n FROM categories'),

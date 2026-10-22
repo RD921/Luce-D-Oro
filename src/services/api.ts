@@ -564,6 +564,7 @@ export const api = {
 
 export interface ArchitectureOverview {
   geradoEm: string;
+  ultimaAtividade: string | null;
   site: { id: string; nome: string; dominio: string | null; tecnologia: string; ambiente: string; estadoConexao: string; armazenamento: string; publicacao: string };
   contagens: Record<string, number>;
   usuariosPorPapel: Array<{ role: string; n: number }>;

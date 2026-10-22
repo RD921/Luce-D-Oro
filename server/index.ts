@@ -1392,6 +1392,16 @@ app.delete('/api/admin/banners/:id', painel('banners'), (req: AuthenticatedReque
   res.json({ success: true, message: 'Banner removido.' });
 });
 
+// Verificação simples de saúde (pública, sem dados sensíveis): o painel mostra "Sistema online" a partir dela.
+app.get('/api/health', (_req: Request, res: Response) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true, db: true, time: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ ok: false, db: false });
+  }
+});
+
 // 6. Admin Settings
 app.get('/api/admin/settings', painel('configuracoes'), (_req: AuthenticatedRequest, res: Response) => {
   const rows = db.prepare('SELECT key, value FROM system_settings').all() as Array<{ key: string; value: string }>;

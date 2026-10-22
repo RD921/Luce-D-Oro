@@ -5,24 +5,24 @@
 
 /* ---------- Variables for Admin Dark Theme ---------- */
 .adminRoot {
-  --adm-bg: #0F0F0F;
-  --adm-bg-surface: #181818;
-  --adm-bg-card: #1E1E1E;
-  --adm-bg-hover: #252525;
-  --adm-bg-input: #141414;
-  --adm-border: rgba(255,255,255,0.06);
-  --adm-border-md: rgba(255,255,255,0.1);
-  --adm-text: #F0EDE8;
-  --adm-text-muted: #888580;
-  --adm-text-dim: #555250;
-  --adm-gold: #B89758;
-  --adm-gold-light: #DFC8A2;
-  --adm-gold-glow: rgba(184,151,88,0.18);
-  --adm-red: #E05252;
-  --adm-green: #52C98A;
-  --adm-blue: #5294E0;
-  --adm-yellow: #E0C252;
-  --adm-orange: #E08952;
+  --adm-bg: #0b1116;
+  --adm-bg-surface: #080e13;
+  --adm-bg-card: #0e161c;
+  --adm-bg-hover: #141e26;
+  --adm-bg-input: #0a1015;
+  --adm-border: rgba(255,255,255,0.07);
+  --adm-border-md: rgba(255,255,255,0.12);
+  --adm-text: #e8ecf0;
+  --adm-text-muted: #8a95a1;
+  --adm-text-dim: #566170;
+  --adm-gold: #9199a4;          /* destaque em prata (nome antigo mantido) */
+  --adm-gold-light: #c5ccd6;
+  --adm-gold-glow: rgba(145,153,164,0.14);
+  --adm-red: #e05252;
+  --adm-green: #52c98a;
+  --adm-blue: #5294e0;
+  --adm-yellow: #e0c252;
+  --adm-orange: #e08952;
   --adm-sidebar-w: 240px;
   font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
 }
@@ -73,7 +73,7 @@
   text-transform: uppercase;
   color: var(--adm-gold);
   background: var(--adm-gold-glow);
-  border: 1px solid rgba(184,151,88,0.3);
+  border: 1px solid rgba(145,153,164,0.3);
   padding: 0.25rem 0.6rem;
   margin-bottom: 0.6rem;
 }
@@ -140,7 +140,7 @@
 .navItemActive {
   background: var(--adm-gold-glow);
   color: var(--adm-gold-light);
-  border: 1px solid rgba(184,151,88,0.2);
+  border: 1px solid rgba(145,153,164,0.2);
 }
 
 .navItemActive::before {
@@ -928,6 +928,63 @@ tr:hover td {
 
 .tagGold {
   background: var(--adm-gold-glow);
-  border-color: rgba(184,151,88,0.3);
+  border-color: rgba(145,153,164,0.3);
   color: var(--adm-gold-light);
 }
+
+
+/* ===== Topo: estado do sistema, notificações e conta ===== */
+.sysStatus { display:inline-flex; align-items:center; gap:.45rem; font-size:.75rem; color:var(--adm-text-muted); }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--adm-text-dim); flex-shrink:0; }
+.dotOk { background:var(--adm-green); }
+.dotFail { background:var(--adm-red); }
+.dotWarn { background:var(--adm-yellow); }
+.dotInfo { background:var(--adm-blue); }
+.iconBtn { position:relative; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; background:none; border:1px solid transparent; border-radius:6px; color:var(--adm-text-muted); cursor:pointer; }
+.iconBtn:hover { background:var(--adm-bg-hover); color:var(--adm-text); }
+.popover { position:absolute; right:0; top:calc(100% + 8px); min-width:260px; background:var(--adm-bg-card); border:1px solid var(--adm-border-md); border-radius:8px; padding:.9rem 1rem; z-index:50; box-shadow:0 12px 32px rgba(0,0,0,.45); font-size:.78rem; color:var(--adm-text-muted); }
+.relative { position:relative; }
+.userChip { display:flex; align-items:center; gap:.65rem; }
+.avatar { width:34px; height:34px; border-radius:50%; border:1px solid var(--adm-border-md); display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:600; color:var(--adm-text); }
+.userName { font-size:.78rem; color:var(--adm-text); line-height:1.2; }
+.userSub { font-size:.68rem; color:var(--adm-text-muted); }
+
+/* ===== Submenu de Configurações ===== */
+.subNav { margin:.15rem 0 .4rem 1.55rem; padding-left:.75rem; border-left:1px solid var(--adm-border); display:flex; flex-direction:column; }
+.subNavItem { background:none; border:none; text-align:left; padding:.4rem .5rem; font-size:.78rem; color:var(--adm-text-muted); cursor:pointer; border-radius:4px; font-family:inherit; }
+.subNavItem:hover { color:var(--adm-text); }
+.subNavActive { color:var(--adm-text); background:var(--adm-bg-hover); }
+
+/* ===== Arquitetura Adm. ===== */
+.archHead { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.archTitle { font-size:1.35rem; font-weight:600; color:var(--adm-text); margin:0; }
+.archDesc { font-size:.85rem; color:var(--adm-text-muted); margin:.25rem 0 0; }
+.siteSelect { display:inline-flex; align-items:center; gap:.6rem; background:var(--adm-bg-card); border:1px solid var(--adm-border-md); border-radius:8px; padding:.6rem .9rem; font-size:.8rem; color:var(--adm-text); }
+.archCards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; margin-bottom:1.25rem; }
+.archCard { text-align:left; background:var(--adm-bg-card); border:1px solid var(--adm-border); border-radius:8px; padding:1.2rem 1.2rem 1.1rem; cursor:pointer; color:var(--adm-text); font-family:inherit; display:flex; flex-direction:column; gap:.55rem; transition:border-color 160ms ease, background 160ms ease; position:relative; min-height:128px; }
+.archCard:hover { border-color:var(--adm-border-md); background:var(--adm-bg-hover); }
+.archCardTop { display:flex; justify-content:space-between; align-items:flex-start; color:var(--adm-gold-light); }
+.archCardArrow { color:var(--adm-text-dim); }
+.archCardTitle { font-size:.95rem; font-weight:600; }
+.archCardDesc { font-size:.76rem; line-height:1.5; color:var(--adm-text-muted); }
+.soon { position:absolute; right:.9rem; bottom:.8rem; font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--adm-text-dim); }
+.archPanel { background:var(--adm-bg-card); border:1px solid var(--adm-border); border-radius:8px; margin-bottom:1.25rem; }
+.archPanelHead { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1rem 1.2rem; flex-wrap:wrap; }
+.archPanelTitle { font-size:.95rem; font-weight:600; color:var(--adm-text); }
+.archTable { width:100%; border-collapse:collapse; font-size:.78rem; }
+.archTable th { text-align:left; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--adm-text-dim); padding:.7rem 1.2rem; border-top:1px solid var(--adm-border); border-bottom:1px solid var(--adm-border); font-weight:600; }
+.archTable td { padding:.85rem 1.2rem; border-bottom:1px solid var(--adm-border); color:var(--adm-text-muted); }
+.archTable tr:last-child td { border-bottom:none; }
+.siteCell { display:flex; align-items:center; gap:.8rem; color:var(--adm-text); }
+.siteTile { width:40px; height:40px; border-radius:6px; border:1px solid var(--adm-border-md); display:inline-flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',Georgia,serif; font-size:1rem; color:var(--adm-text); flex-shrink:0; }
+.siteSub { display:block; font-size:.7rem; color:var(--adm-text-muted); }
+.archBottom { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:1rem; }
+.archList { padding:0 1.2rem 1rem; }
+.archRow { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.7rem 0; border-top:1px solid var(--adm-border); font-size:.78rem; color:var(--adm-text-muted); }
+.archRow:first-child { border-top:none; }
+.archRowMain { color:var(--adm-text); }
+.archBack { background:none; border:none; color:var(--adm-text-muted); font-family:inherit; font-size:.78rem; cursor:pointer; padding:0 0 .8rem; }
+.archBack:hover { color:var(--adm-text); }
+.searchBox { background:var(--adm-bg-input); border:1px solid var(--adm-border-md); border-radius:6px; color:var(--adm-text); font-family:inherit; font-size:.78rem; padding:.5rem .8rem; min-width:190px; }
+@media (max-width:1200px){ .archCards{ grid-template-columns:repeat(2,minmax(0,1fr)); } .archBottom{ grid-template-columns:1fr; } }
+@media (max-width:640px){ .archCards{ grid-template-columns:1fr; } .userChip .userName, .userChip .userSub{ display:none; } .archTable th:nth-child(n+3), .archTable td:nth-child(n+3){ display:none; } }
