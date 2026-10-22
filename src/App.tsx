@@ -1,4 +1,5 @@
 import { IntroSound } from './features/intro/IntroSound';
+import { SeoHead } from './features/seo/SeoHead';
 import { EditorBridge } from './features/editor/EditorBridge';
 import { useState, useEffect } from 'react';
 import { ToastProvider } from './context/ToastContext';
@@ -99,6 +100,7 @@ function AppContent() {
 
       <IntroSound pausado={adminOpen} />
       <EditorBridge />
+      <SeoHead categoriaNome={currentView === 'category' ? categories.find((c) => c.slug === currentCategory)?.name : undefined} />
 
       {/* Checkout Modal */}
       <CheckoutModal onOrderSuccess={() => setOrdersModalOpen(true)} />

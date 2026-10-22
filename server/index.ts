@@ -13,6 +13,7 @@ import {
 } from './db.js';
 import { registerAdminExtras } from './adminExtras.js';
 import { registerAdminMedia } from './adminMedia.js';
+import { registerAdminSettingsExtras } from './adminSettingsExtras.js';
 import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
 import { registerAdminCommerce, ESTOQUE_SQL, temVariantes, estoqueDaVariante, baixarEstoque, variantesDe, resolverEntrega, resolverPagamento, limiteFreteGratis } from './adminCommerce.js';
@@ -861,6 +862,7 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 const painel = criarPainel(authMiddleware as any);
 registerAdminExtras(app, painel);
 registerAdminMedia(app, painel);
+registerAdminSettingsExtras(app, painel);
 registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
 registerAdminCatalog(app, painel);

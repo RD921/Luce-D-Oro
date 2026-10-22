@@ -11,6 +11,7 @@ import { api, type ArchitectureOverview, type Category, type Product, type Order
 import { ArchitectureHome } from './ArchitectureHome';
 import { MediaLibrary, MediaPicker } from './MediaLibrary';
 import { VisualEditor } from './VisualEditor';
+import { SeoSettings, IntegrationsPanel, NotificationsPanel } from './SettingsExtras';
 import styles from './AdminPanel.module.css';
 
 // ============================================================
@@ -162,10 +163,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { user, logout, isOwner } = useAuth();
   const abas = TABS.filter(t => (t.owner ? isOwner : isOwner || Boolean(t.area && user?.areas?.[t.area])));
   const [activeTab, setActiveTab] = useState<TabId>(abas[0]?.id ?? 'dashboard');
+  const canSettings = abas.some(t => t.id === 'settings');
   const [settingsSub, setSettingsSub] = useState<SettingsSub>('geral');
   const [archSection, setArchSection] = useState<string | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
   const [sino, setSino] = useState(false);
+  const [notifs, setNotifs] = useState<{ itens: Array<{ id: number; tipo: string; titulo: string; mensagem: string; created_at: string; lida: boolean }>; naoLidas: number } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    const buscar = () => api.admin.getNotifications('', 8).then(r => { if (vivo) setNotifs(r); }).catch(() => {});
+    buscar();
+    const t = setInterval(buscar, 60000);
+    return () => { vivo = false; clearInterval(t); };
+  }, []);
   const [menuConta, setMenuConta] = useState(false);
 
   // "Sistema online" vem de uma verificação real do servidor, repetida a cada 30 segundos.
@@ -246,8 +256,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               {online === null ? 'Verificando…' : online ? 'Sistema online' : 'Sem resposta do servidor'}
             </span>
             <div className={styles.relative}>
-              <button className={styles.iconBtn} aria-label="Notificações" onClick={() => { setSino(v => !v); setMenuConta(false); }}><Bell size={17} strokeWidth={1.4} /></button>
-              {sino && <div className={styles.popover}>Nenhuma notificação. A central de notificações persistente chega na fase 7.</div>}
+              <button className={styles.iconBtn} aria-label="Notificações" style={{ position: 'relative' }} onClick={() => { setSino(v => !v); setMenuConta(false); }}>
+                <Bell size={17} strokeWidth={1.4} />
+                {!!notifs?.naoLidas && <span data-testid="sino-contagem" style={{ position: 'absolute', top: -2, right: -2, background: '#e57373', color: '#fff', borderRadius: 9, fontSize: 10, minWidth: 16, height: 16, lineHeight: '16px', textAlign: 'center' }}>{notifs.naoLidas > 9 ? '9+' : notifs.naoLidas}</span>}
+              </button>
+              {sino && (
+                <div className={styles.popover} style={{ width: 320, maxHeight: 380, overflowY: 'auto' }}>
+                  {!notifs || notifs.itens.length === 0 ? <div>Nenhuma notificação.</div> : notifs.itens.map(n => (
+                    <div key={n.id} style={{ padding: '7px 0', borderBottom: '1px solid var(--adm-border)', opacity: n.lida ? 0.6 : 1 }}>
+                      <div style={{ fontSize: '.8rem', fontWeight: n.lida ? 400 : 600 }}>{n.titulo}</div>
+                      <div style={{ fontSize: '.7rem', color: 'var(--adm-text-muted)' }}>{n.mensagem}</div>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
+                    <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={async () => { await api.admin.markNotificationsRead().catch(() => {}); setNotifs(await api.admin.getNotifications('', 8)); }}>Marcar como lidas</button>
+                    {canSettings && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => { setSino(false); setSettingsSub('notificacoes'); setActiveTab('settings'); }}>Ver todas</button>}
+                  </div>
+                </div>
+              )}
             </div>
             <div className={styles.relative}>
               <button className={`${styles.iconBtn} ${styles.userChip}`} style={{ width: 'auto', padding: '0 .4rem' }} onClick={() => { setMenuConta(v => !v); setSino(false); }}>
@@ -2094,19 +2120,9 @@ function SettingsTab() {
 // ============================================================
 function SettingsSection({ sub }: { sub: SettingsSub }) {
   if (sub === 'geral') return <SettingsTab />;
-  const info: Record<string, { titulo: string; texto: string }> = {
-    seo: { titulo: 'SEO', texto: 'Título, descrição, URL canônica, imagem de compartilhamento e sitemap por página. Hoje só a descrição geral do site pode ser editada, em Geral.' },
-    integracoes: { titulo: 'Integrações', texto: 'Estado e teste de conexão de pagamentos, entrega e analytics. Nenhuma integração externa está conectada hoje.' },
-    notificacoes: { titulo: 'Notificações', texto: 'Central persistente de avisos administrativos (publicação, mídia, segurança, integrações).' },
-  };
-  const i = info[sub];
-  return (
-    <div className={styles.tableWrapper} style={{ padding: '1.5rem' }}>
-      <div className={styles.sectionTitle}>{i.titulo}</div>
-      <p style={{ color: 'var(--adm-text-muted)', marginTop: '.5rem', lineHeight: 1.7 }}>{i.texto}</p>
-      <p style={{ color: 'var(--adm-text-dim)', fontSize: '.78rem' }}>Ainda não disponível: será entregue na fase 7 do plano, com funcionamento real.</p>
-    </div>
-  );
+  if (sub === 'seo') return <SeoSettings />;
+  if (sub === 'integracoes') return <IntegrationsPanel />;
+  return <NotificationsPanel />;
 }
 
 const ESTADO_INFO: Record<string, { rotulo: string; cor: string }> = {

@@ -39,6 +39,41 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
 }
 
 // Audit Log Helper
+// Central de notificações do painel: nasce dos eventos de auditoria que a equipe precisa ver.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL,
+    titulo TEXT NOT NULL,
+    mensagem TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL,
+    user_email TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS admin_notification_cursor (
+    user_id INTEGER PRIMARY KEY,
+    last_read_id INTEGER NOT NULL DEFAULT 0
+  );
+`);
+
+const NOTIFICAR: Record<string, { tipo: 'info' | 'aviso' | 'seguranca'; titulo: string }> = {
+  CONTENT_PUBLISHED: { tipo: 'info', titulo: 'Alterações publicadas no site' },
+  MEDIA_DELETED: { tipo: 'info', titulo: 'Imagem excluída da biblioteca' },
+  MEDIA_REPLACED: { tipo: 'info', titulo: 'Imagem substituída na biblioteca' },
+  MEDIA_UPLOAD_REJECTED: { tipo: 'aviso', titulo: 'Envio de imagem recusado' },
+  MEDIA_STORAGE_ERROR: { tipo: 'aviso', titulo: 'Falha ao gravar imagem no armazenamento' },
+  SETTINGS_UPDATED: { tipo: 'info', titulo: 'Configurações da loja alteradas' },
+  SEO_UPDATED: { tipo: 'info', titulo: 'Configurações de SEO alteradas' },
+  PAYMENT_METHOD_CREATED: { tipo: 'info', titulo: 'Forma de pagamento criada' },
+  PAYMENT_METHOD_UPDATED: { tipo: 'info', titulo: 'Forma de pagamento alterada' },
+  PAYMENT_METHOD_DELETED: { tipo: 'aviso', titulo: 'Forma de pagamento removida' },
+  TEAM_MEMBER_SET: { tipo: 'seguranca', titulo: 'Membro da equipe adicionado ou alterado' },
+  TEAM_MEMBER_CHANGED: { tipo: 'seguranca', titulo: 'Permissões de um membro da equipe alteradas' },
+  TEAM_MEMBER_REMOVED: { tipo: 'seguranca', titulo: 'Membro da equipe removido' },
+  UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT: { tipo: 'seguranca', titulo: 'Tentativa de acesso não autorizado ao painel' },
+  ILLEGAL_OWNER_CLAIM_ATTEMPT: { tipo: 'seguranca', titulo: 'Tentativa de assumir a conta do proprietário' },
+};
+
 export function logAudit(data: {
   userId?: number | null;
   userEmail?: string | null;
@@ -61,6 +96,11 @@ export function logAudit(data: {
       data.details ? JSON.stringify(data.details) : null,
       data.ipAddress || null
     );
+    const n = NOTIFICAR[data.action];
+    if (n) {
+      db.prepare('INSERT INTO admin_notifications (tipo, titulo, mensagem, action, user_email) VALUES (?, ?, ?, ?, ?)')
+        .run(n.tipo, n.titulo, data.userEmail ? `Por ${data.userEmail}` : '', data.action, data.userEmail || null);
+    }
   } catch (err) {
     console.error('[Audit Log Error]', err);
   }

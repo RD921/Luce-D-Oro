@@ -346,6 +346,9 @@ export const api = {
     get: () => request<Record<string, string>>('/api/settings'),
   },
 
+  seo: {
+    get: () => request<{ title: string; description: string; ogImage: string; siteUrl: string; noindex: boolean; categoryTitle: string }>('/api/seo'),
+  },
   content: {
     get: () => request<Record<string, string>>('/api/content'),
   },
@@ -492,6 +495,12 @@ export const api = {
     getContent: () =>
       request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
 
+    getSeo: () => request<{ valores: Record<string, string>; padrao: Record<string, string> }>('/api/admin/seo'),
+    saveSeo: (v: Record<string, string>) => request<{ success: boolean; valores: Record<string, string> }>('/api/admin/seo', { method: 'PUT', body: JSON.stringify(v) }),
+    getNotifications: (tipo = '', limit = 50) =>
+      request<{ itens: Array<{ id: number; tipo: 'info' | 'aviso' | 'seguranca'; titulo: string; mensagem: string; user_email: string | null; created_at: string; lida: boolean }>; naoLidas: number }>(`/api/admin/notifications?limit=${limit}${tipo ? `&tipo=${tipo}` : ''}`),
+    markNotificationsRead: () => request<{ success: boolean }>('/api/admin/notifications/read', { method: 'POST' }),
+    getIntegrations: () => request<{ verificadoEm: string; itens: Array<{ id: string; nome: string; estado: 'ok' | 'falha' | 'atencao' | 'nao_integrada'; detalhe: string }> }>('/api/admin/integrations'),
     getContentDraft: () =>
       request<{ campos: Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean }>; alteracoes: number }>('/api/admin/content/draft'),
     getContentPreview: () => request<Record<string, string>>('/api/admin/content/preview'),
