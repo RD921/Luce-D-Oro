@@ -57,6 +57,7 @@ export function MediaLibrary({ onPick }: { onPick?: (url: string) => void }) {
 
   return (
     <div>
+      {!onPick && <ImagensDoSite onImportado={carregar} />}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ position: 'relative', flex: '1 1 220px' }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: 11, opacity: .6 }} />
@@ -212,6 +213,63 @@ export function MediaPicker({ onPick, onClose }: { onPick: (url: string) => void
         <div className={styles.modalHeader}><div className={styles.modalTitle}>Escolher da biblioteca</div><button className={styles.modalCloseBtn} onClick={onClose} aria-label="Fechar"><X size={16} /></button></div>
         <div className={styles.modalBody}><MediaLibrary onPick={u => { onPick(u); onClose(); }} /></div>
       </div>
+    </div>
+  );
+}
+
+type Slot = { key: string; label: string; group: string; def: string; value: string; customized: boolean };
+
+// Onde cada imagem fixa do site (logos, faixa principal, etc.) é usada hoje, com troca direta pela biblioteca.
+function ImagensDoSite({ onImportado }: { onImportado: () => void }) {
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [escolhendo, setEscolhendo] = useState<Slot | null>(null);
+  const [msg, setMsg] = useState('');
+  const [erro, setErro] = useState('');
+  const [aberto, setAberto] = useState(true);
+  const carregar = useCallback(() => {
+    api.admin.getContent().then(r => setSlots(r.filter(f => f.type === 'image'))).catch((e: any) => setErro(e.message || 'Não foi possível carregar as imagens do site.'));
+  }, []);
+  useEffect(carregar, [carregar]);
+
+  const salvar = async (slot: Slot, valor: string) => {
+    setErro(''); setMsg('');
+    try { await api.admin.updateContent({ [slot.key]: valor }); setMsg(valor ? `“${slot.label}” atualizada.` : `“${slot.label}” voltou ao padrão.`); carregar(); onImportado(); }
+    catch (e: any) { setErro(e.message || 'Não foi possível salvar.'); }
+  };
+  const importar = async () => {
+    setErro(''); setMsg('');
+    try { const r = await api.admin.mediaImportarSite(); setMsg(r.importadas ? `${r.importadas} imagem(ns) do site importada(s) para a biblioteca.` : 'As imagens do site já estavam na biblioteca.'); onImportado(); }
+    catch (e: any) { setErro(e.message || 'Não foi possível importar.'); }
+  };
+
+  return (
+    <div style={{ background: 'var(--adm-card)', border: '1px solid var(--adm-border)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: '.9rem' }}>Imagens do site</strong>
+        <span style={{ color: 'var(--adm-text-muted)', fontSize: '.78rem', flex: 1 }}>Onde cada imagem fixa aparece. Troque por uma da biblioteca; “Restaurar” volta à original.</span>
+        <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={importar}>Importar imagens do site</button>
+        <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setAberto(a => !a)}>{aberto ? 'Recolher' : 'Mostrar'}</button>
+      </div>
+      {msg && <div style={{ color: 'var(--adm-green)', marginTop: 8, fontSize: '.82rem' }}>{msg}</div>}
+      {erro && <div style={{ color: '#e57373', marginTop: 8, fontSize: '.82rem' }}>{erro}</div>}
+      {aberto && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12, marginTop: 12 }}>
+          {slots.map(sl => (
+            <div key={sl.key} data-testid="slot" style={{ display: 'flex', gap: 10, alignItems: 'center', border: '1px solid var(--adm-border)', borderRadius: 8, padding: 8 }}>
+              <img src={sl.value} alt="" style={{ width: 64, height: 64, objectFit: 'contain', background: '#05090c', borderRadius: 6 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '.78rem' }}>{sl.label}</div>
+                <div style={{ fontSize: '.68rem', color: 'var(--adm-text-muted)' }}>{sl.group} · {sl.customized ? 'personalizada' : 'original'}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => setEscolhendo(sl)}>Trocar</button>
+                  {sl.customized && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => salvar(sl, '')}>Restaurar</button>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {escolhendo && <MediaPicker onPick={u => salvar(escolhendo, u)} onClose={() => setEscolhendo(null)} />}
     </div>
   );
 }

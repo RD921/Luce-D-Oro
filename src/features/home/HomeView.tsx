@@ -17,7 +17,7 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
     title: heroBanner?.title || 'Detalhes que contam a sua história.',
     subtitle: heroBanner?.subtitle ?? 'Joias forjadas em ouro nobre 18k com acabamento primoroso. O encontro harmonioso entre o luxo discreto e a autenticidade contemporânea.',
     cta: heroBanner?.cta_text || 'Descubra a coleção',
-    image: heroBanner?.image_desktop || '/images/hero-luce-d-oro.png',
+    image: heroBanner?.image_desktop || c('hero_fallback'),
   };
 
   const handleHeroCta = () => {
@@ -79,7 +79,7 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
               {c('story_p2')}
             </p>
             <div className={styles.signature}>
-              <img src="/images/logo-header.png" alt="Luce D'Oro" className={styles.signatureLogo} />
+              <img src={c('logo_signature')} alt="Luce D'Oro" className={styles.signatureLogo} />
               <span className={styles.signatureText}>{c('story_signature')}</span>
             </div>
           </div>

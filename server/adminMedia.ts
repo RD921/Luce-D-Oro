@@ -156,6 +156,15 @@ const publico = (r: MidiaRow, usos?: string[]) => ({
   usos: usos ? usos.length : undefined, locais: usos,
 });
 
+// Pasta das imagens que acompanham o site (logos, banners e fotos iniciais).
+function pastaImagensDoSite(): string | null {
+  for (const d of [path.resolve(process.cwd(), 'public', 'images'), path.resolve(process.cwd(), 'dist', 'images')]) {
+    if (fs.existsSync(d)) return d;
+  }
+  return null;
+}
+const CATEGORIA_POR_ARQUIVO: Array<[RegExp, string]> = [[/^logo/, 'logotipos'], [/^hero/, 'home'], [/^category/, 'galerias'], [/^product/, 'galerias'], [/^materials/, 'institucional']];
+
 export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHandler) {
   migrarMidia();
   sincronizarPasta();
@@ -191,6 +200,37 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
     const total = linhas.length;
     const itens = linhas.slice((pagina - 1) * porPagina, pagina * porPagina).map((r) => publico(r, usos.get(r.file_name)));
     res.json({ itens, total, pagina, porPagina });
+  });
+
+  // Copia para a biblioteca as imagens que já vêm com o site, para poderem ser vistas, escolhidas e substituídas.
+  // Os originais continuam onde estão; nada é apagado nem alterado.
+  app.post('/api/admin/media/import-site-images', porta, (req: Request, res: Response) => {
+    const u = quem(req);
+    const origem = pastaImagensDoSite();
+    if (!origem) { res.status(404).json({ error: 'Pasta de imagens do site não encontrada neste servidor.' }); return; }
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const jaImportado = db.prepare("SELECT 1 FROM media_files WHERE site_id = ? AND original_name = ? AND uploaded_by = 'site'");
+    const ins = db.prepare(`INSERT INTO media_files (id, site_id, file_name, original_name, mime, bytes, width, height, alt_text, category, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, 'site')`);
+    let importadas = 0, ignoradas = 0;
+    for (const nome of fs.readdirSync(origem)) {
+      const caminho = path.join(origem, nome);
+      try {
+        if (!fs.statSync(caminho).isFile()) continue;
+        if (jaImportado.get(SITE_ID, nome)) { ignoradas++; continue; }
+        const buf = fs.readFileSync(caminho);
+        const tipo = detectarTipo(buf);
+        if (!tipo) continue;
+        const dim = dimensoes(buf, tipo);
+        const arquivo = `${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.${tipo}`;
+        fs.writeFileSync(path.join(UPLOAD_DIR, arquivo), buf);
+        const cat = CATEGORIA_POR_ARQUIVO.find(([re]) => re.test(nome))?.[1] ?? 'geral';
+        ins.run(crypto.randomUUID(), SITE_ID, arquivo, nome, MIME[tipo], buf.length, dim?.width ?? null, dim?.height ?? null, cat);
+        importadas++;
+      } catch { /* arquivo ilegível: segue */ }
+    }
+    logAudit({ userId: u.id, userEmail: u.email, action: 'MEDIA_SITE_IMAGES_IMPORTED', entity: 'MEDIA', details: { importadas, ignoradas } });
+    res.json({ importadas, ignoradas });
   });
 
   app.get('/api/admin/media/:id', porta, (req: Request, res: Response) => {

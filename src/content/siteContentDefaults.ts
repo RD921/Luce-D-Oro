@@ -13,6 +13,13 @@ export interface ContentField {
 }
 
 export const CONTENT_FIELDS: ContentField[] = [
+  // ---- Identidade visual e imagens padrão ----
+  { key: 'logo_header', group: 'Identidade visual', label: 'Logo do cabeçalho', type: 'image', def: '/images/logo-crop.png' },
+  { key: 'logo_footer', group: 'Identidade visual', label: 'Logo do rodapé', type: 'image', def: '/images/logo-crop.png' },
+  { key: 'logo_signature', group: 'Identidade visual', label: 'Logo da assinatura (manifesto)', type: 'image', def: '/images/logo-header.png' },
+  { key: 'hero_fallback', group: 'Imagens padrão', label: 'Imagem da faixa principal (quando não há banner ativo)', type: 'image', def: '/images/hero-luce-d-oro.png' },
+  { key: 'category_banner_fallback', group: 'Imagens padrão', label: 'Imagem de topo das categorias (quando a categoria não tem foto)', type: 'image', def: '/images/hero-editorial.jpg' },
+
   // ---- Página inicial: coleções e destaques ----
   { key: 'collections_tag', group: 'Página inicial — Coleções', label: 'Etiqueta acima do título', type: 'text', def: "UNIVERSO LUCE D'ORO" },
   { key: 'collections_title', group: 'Página inicial — Coleções', label: 'Título', type: 'text', def: 'Nossas Coleções' },
@@ -20,7 +27,7 @@ export const CONTENT_FIELDS: ContentField[] = [
   { key: 'featured_title', group: 'Página inicial — Destaques', label: 'Título', type: 'text', def: 'Joias em Destaque' },
 
   // ---- Página inicial: materiais ----
-  { key: 'materials_image', group: 'Página inicial — Materiais', label: 'Imagem', type: 'image', def: '/images/materials-macro.jpg' },
+  { key: 'materials_image', group: 'Página inicial — Materiais', label: 'Imagem da seção Materiais', type: 'image', def: '/images/materials-macro.jpg' },
   { key: 'materials_pill', group: 'Página inicial — Materiais', label: 'Selo sobre a imagem', type: 'text', def: 'Atelier de Ourivesaria' },
   { key: 'materials_tag', group: 'Página inicial — Materiais', label: 'Etiqueta acima do título', type: 'text', def: 'RIGOR E MATÉRIA-PRIMA' },
   { key: 'materials_title', group: 'Página inicial — Materiais', label: 'Título', type: 'text', def: 'A Pureza do Ouro 18k e a Mestria do Acabamento' },

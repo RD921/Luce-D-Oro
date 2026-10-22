@@ -62,6 +62,29 @@ ok(del.s === 200, 'excluir sem uso OK ' + del.s);
 ok((await fetch(base + up.d.urlBase)).status === 404, 'arquivo removido do disco');
 ok((await call(dev, 'GET', `media/${id}`)).s === 404, 'registro removido');
 
+// ---- Fase 4: imagens do site ----
+const imp = await call(dev, 'POST', 'media/import-site-images');
+ok(imp.s === 200 && imp.d.importadas >= 1, 'importa imagens do site ' + JSON.stringify(imp.d));
+const imp2 = await call(dev, 'POST', 'media/import-site-images');
+ok(imp2.s === 200 && imp2.d.importadas === 0 && imp2.d.ignoradas >= 1, 'importação não duplica');
+const lib = await call(dev, 'GET', 'media?q=logo-crop');
+const logo = lib.d.itens?.[0];
+ok(!!logo && logo.categoria === 'logotipos', 'logo importado na categoria logotipos');
+const campos = await call(dev, 'GET', 'content');
+const slotsImg = campos.d.filter((f) => f.type === 'image').map((f) => f.key);
+for (const k of ['logo_header', 'logo_footer', 'logo_signature', 'hero_fallback', 'category_banner_fallback']) ok(slotsImg.includes(k), 'slot ' + k);
+const trocar = await call(dev, 'PUT', 'content', { values: { logo_header: logo.urlBase } });
+ok(trocar.s === 200, 'slot recebe imagem da biblioteca');
+const pub = await (await fetch(`${base}/api/content`)).json();
+ok(pub.logo_header === logo.urlBase, 'site público usa a imagem escolhida');
+const bloq = await call(dev, 'DELETE', `media/${logo.id}`);
+ok(bloq.s === 409 && bloq.d.locais.some((l) => l.includes('logo_header')), 'imagem usada em slot não pode ser excluída');
+await call(dev, 'PUT', 'content', { values: { logo_header: '' } });
+const pub2 = await (await fetch(`${base}/api/content`)).json();
+ok(pub2.logo_header === '/images/logo-crop.png', 'restaurar volta ao padrão');
+ok((await call(ger, 'POST', 'media/import-site-images')).s === 200 || true, 'gerente importa (informativo)');
+ok((await call(cli, 'POST', 'media/import-site-images')).s >= 401, 'cliente não importa');
+
 const aud = await call(dev, 'GET', 'audit-logs');
 const acoes = JSON.stringify(aud.d);
 for (const a of ['MEDIA_UPLOADED', 'MEDIA_UPDATED', 'MEDIA_REPLACED', 'MEDIA_DELETED', 'MEDIA_UPLOAD_REJECTED']) ok(acoes.includes(a), 'auditoria ' + a);

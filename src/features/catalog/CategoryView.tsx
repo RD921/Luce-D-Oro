@@ -16,21 +16,21 @@ export const CategoryView = ({ categorySlug, onSelectProduct }: CategoryViewProp
   const [sortBy, setSortBy] = useState<string>('featured');
   const [materialFilter, setMaterialFilter] = useState<string>('all');
 
-  const { categories } = useSite();
-  const categoriaAtual = categories.find((c) => c.slug === categorySlug);
+  const { categories, c } = useSite();
+  const categoriaAtual = categories.find((cat) => cat.slug === categorySlug);
 
   const currentMeta = categoriaAtual
     ? {
         title: categoriaAtual.name,
         subtitle: 'COLEÇÃO PERMANENTE',
         description: categoriaAtual.description || "Explore o catálogo exclusivo Luce D'Oro e descubra joias criadas com matérias-primas nobres e rigor artesanal.",
-        banner: categoriaAtual.image_url || '/images/hero-editorial.jpg',
+        banner: categoriaAtual.image_url || c('category_banner_fallback'),
       }
     : {
         title: 'Nossa Coleção',
         subtitle: 'JOALHERIA CONTEMPORÂNEA',
         description: "Explore o catálogo exclusivo Luce D'Oro e descubra joias criadas com matérias-primas nobres e rigor artesanal.",
-        banner: '/images/hero-editorial.jpg',
+        banner: c('category_banner_fallback'),
       };
 
   useEffect(() => {

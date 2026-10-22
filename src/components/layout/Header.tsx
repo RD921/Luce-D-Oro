@@ -14,7 +14,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenAdmin }) => {
   const { user, isAuthenticated, canAdmin, openAuthModal, logout, setOrdersModalOpen } = useAuth();
   const { cart, openCartDrawer } = useCart();
-  const { categories } = useSite();
+  const { categories, c } = useSite();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenA
               aria-label="Luce D'Oro - Página Inicial"
             >
               <img
-                src="/images/logo-crop.png"
+                src={c('logo_header')}
                 alt="Luce D'Oro"
                 className={styles.brandLogoImg}
               />

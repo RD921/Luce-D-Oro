@@ -573,6 +573,7 @@ export const api = {
       const data = await lerArquivo(file);
       return request<MediaItem>(`/api/admin/media/${id}/replace`, { method: 'POST', body: JSON.stringify({ data }) });
     },
+    mediaImportarSite: () => request<{ importadas: number; ignoradas: number }>('/api/admin/media/import-site-images', { method: 'POST' }),
     mediaDelete: (id: string) => request<{ success: boolean }>(`/api/admin/media/${id}`, { method: 'DELETE' }),
 
     // ---- Upload de imagem (arquivo do computador) ----

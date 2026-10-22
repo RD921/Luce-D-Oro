@@ -23,7 +23,7 @@ export const Footer = (_props: FooterProps) => {
             {/* Column 1: Brand info */}
             <div className={styles.brandCol}>
               <div className={styles.brandLogo}>
-                <img src="/images/logo-crop.png" alt="Luce D'Oro" className={styles.footerLogoImg} />
+                <img src={c('logo_footer')} alt="Luce D'Oro" className={styles.footerLogoImg} />
                 <span className={styles.brandName}>LUCE D'ORO</span>
               </div>
               <div className={styles.certBadge}>
