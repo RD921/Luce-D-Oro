@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import styles from './IntroSound.module.css';
-import { emModoEditor } from '../editor/EditorBridge';
+import { emModoEditor } from '../editor/modo';
 
 // Tela de abertura: logo sobre fundo preto, mostrada uma vez por sessão. Sem som.
 const CHAVE_SPLASH = 'ld_intro_done';

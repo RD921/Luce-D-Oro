@@ -41,7 +41,7 @@ export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
     { icon: <ImageIcon size={26} strokeWidth={1.3} />, titulo: 'Biblioteca de mídia', desc: 'Gerencie imagens, arquivos e recursos visuais.', abre: () => onOpenSection('midia') },
     { icon: <MousePointer2 size={26} strokeWidth={1.3} />, titulo: 'Editor visual', desc: 'Edite o conteúdo do site de forma simples e intuitiva.', abre: () => onOpenSection('editor') },
     { icon: <FileText size={26} strokeWidth={1.3} />, titulo: 'Páginas e conteúdo', desc: 'Organize páginas, seções e textos do site.', abre: () => onNavigate('content') },
-    { icon: <RefreshCw size={26} strokeWidth={1.3} />, titulo: 'Versões e publicação', desc: 'Controle rascunhos, histórico e publique alterações.', abre: () => onOpenSection('versoes'), breve: 'Fase 5' },
+    { icon: <RefreshCw size={26} strokeWidth={1.3} />, titulo: 'Versões e publicação', desc: 'Controle rascunhos, histórico e publique alterações.', abre: () => onOpenSection('editor') },
     { icon: <Users size={26} strokeWidth={1.3} />, titulo: 'Sites e clientes', desc: 'Gerencie múltiplos sites e clientes em um só lugar.', abre: () => onOpenSection('sites') },
     { icon: <ShieldCheck size={26} strokeWidth={1.3} />, titulo: 'Segurança e permissões', desc: 'Configure funções, acessos e proteja seus dados.', abre: () => onOpenSection('acesso') },
     { icon: <Activity size={26} strokeWidth={1.3} />, titulo: 'Diagnóstico e auditoria', desc: 'Monitore logs, integrações e o estado do sistema.', abre: () => onOpenSection('diag') },

@@ -4,10 +4,12 @@ import { api } from '../../services/api';
 import { MediaPicker } from './MediaLibrary';
 import styles from './AdminPanel.module.css';
 
-type Campo = { key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; customized: boolean };
+type Campo = { key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean };
+type Versao = { id: number; note: string; changed: number; created_by: string | null; created_at: string };
+const quando = (s: string) => { const d = new Date(s.replace(' ', 'T') + 'Z'); return isNaN(d.getTime()) ? s : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); };
 
 // Editor visual: o site aparece ao lado; clique num elemento marcado para editar texto ou imagem.
-// Por enquanto salvar aplica na hora no site (rascunhos e versões chegam na próxima fase).
+// Salvar guarda um RASCUNHO (só aparece na prévia). O site público só muda ao clicar em Publicar; cada publicação vira uma versão.
 export function VisualEditor() {
   const [campos, setCampos] = useState<Campo[]>([]);
   const [chave, setChave] = useState<string | null>(null);
@@ -18,9 +20,14 @@ export function VisualEditor() {
   const [celular, setCelular] = useState(false);
   const [biblioteca, setBiblioteca] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [alteracoes, setAlteracoes] = useState(0);
+  const [painel, setPainel] = useState<null | 'publicar' | 'versoes' | 'descartar' | 'original'>(null);
+  const [nota, setNota] = useState('');
+  const [versoes, setVersoes] = useState<Versao[]>([]);
+  const [ocupado, setOcupado] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
 
-  const carregar = useCallback(() => api.admin.getContent().then(setCampos).catch((e: any) => setErro(e.message || 'Não foi possível carregar os campos.')), []);
+  const carregar = useCallback(() => api.admin.getContentDraft().then(r => { setCampos(r.campos); setAlteracoes(r.alteracoes); }).catch((e: any) => setErro(e.message || 'Não foi possível carregar os campos.')), []);
   useEffect(() => { void carregar(); }, [carregar]);
 
   const escolher = useCallback((key: string | null, lista: Campo[]) => {
@@ -39,6 +46,16 @@ export function VisualEditor() {
     return () => window.removeEventListener('message', ouvir);
   }, [campos, escolher]);
 
+  const atualizarPrevia = () => frame.current?.contentWindow?.postMessage({ tipo: 'ld-atualizar' }, window.location.origin);
+  const fechar = () => { setPainel(null); setNota(''); };
+  const executar = async (fn: () => Promise<string>) => {
+    setOcupado(true); setErro('');
+    try { const m = await fn(); const r = await api.admin.getContentDraft(); setCampos(r.campos); setAlteracoes(r.alteracoes); setChave(null); setMsg(m); atualizarPrevia(); fechar(); }
+    catch (e: any) { setErro(e.message || 'Não foi possível concluir.'); }
+    setOcupado(false);
+  };
+  const abrirVersoes = async () => { setPainel('versoes'); setErro(''); try { setVersoes(await api.admin.getContentVersions()); } catch (e: any) { setErro(e.message || 'Não foi possível carregar o histórico.'); } };
+
   const atual = campos.find(c => c.key === chave) || null;
   const mudou = !!atual && valor !== atual.value;
 
@@ -46,13 +63,13 @@ export function VisualEditor() {
     if (!atual) return;
     setSalvando(true); setErro(''); setMsg('');
     try {
-      await api.admin.updateContent({ [atual.key]: novo });
-      const lista = await api.admin.getContent();
-      setCampos(lista);
-      const c = lista.find(x => x.key === atual.key);
+      await api.admin.saveContentDraft({ [atual.key]: novo });
+      const r = await api.admin.getContentDraft();
+      setCampos(r.campos); setAlteracoes(r.alteracoes);
+      const c = r.campos.find(x => x.key === atual.key);
       setValor(c ? c.value : novo);
-      frame.current?.contentWindow?.postMessage({ tipo: 'ld-atualizar' }, window.location.origin);
-      setMsg(novo ? 'Salvo e aplicado no site.' : 'Voltou ao padrão.');
+      atualizarPrevia();
+      setMsg(novo ? 'Salvo no rascunho. Publique para ir ao ar.' : 'Voltou ao padrão (no rascunho).');
     } catch (e: any) { setErro(e.message || 'Não foi possível salvar.'); }
     setSalvando(false);
   };
@@ -69,6 +86,13 @@ export function VisualEditor() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }}>
       <div>
+        <div data-testid="barra-rascunho" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--adm-border)', background: alteracoes ? 'rgba(234,179,8,.08)' : 'var(--adm-card)' }}>
+          <span style={{ fontSize: '.82rem', flex: 1, minWidth: 180 }}>{alteracoes ? `${alteracoes} alteração(ões) em rascunho — ainda não publicadas` : 'Sem alterações pendentes. O site publicado está igual à prévia.'}</span>
+          <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={!alteracoes} onClick={() => setPainel('publicar')}>Publicar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} disabled={!alteracoes} onClick={() => setPainel('descartar')}>Descartar</button>
+          <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={abrirVersoes}>Versões</button>
+        </div>
+        {msg && !atual && <div style={{ color: 'var(--adm-green)', fontSize: '.82rem', marginBottom: 8 }}>{msg}</div>}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
           <button className={`${styles.btnSmall} ${celular ? styles.btnSmallGhost : styles.btnSmallPrimary}`} onClick={() => setCelular(false)}><Monitor size={13} /> Computador</button>
           <button className={`${styles.btnSmall} ${celular ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setCelular(true)}><Smartphone size={13} /> Celular</button>
@@ -95,7 +119,7 @@ export function VisualEditor() {
                 {campos.filter(c => c.group === g).map(c => (
                   <button key={c.key} data-testid="campo-lista" onClick={() => escolher(c.key, campos)}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 0, color: 'inherit', padding: '5px 0', fontSize: '.8rem', cursor: 'pointer' }}>
-                    {c.label}{c.customized ? ' •' : ''}
+                    {c.label}{c.emRascunho ? ' ● rascunho' : c.customized ? ' •' : ''}
                   </button>
                 ))}
               </div>
@@ -104,8 +128,8 @@ export function VisualEditor() {
         ) : (
           <>
             <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => escolher(null, campos)}>← Todos os elementos</button>
-            <div style={{ marginTop: 12 }}><strong style={{ fontSize: '.9rem' }}>{atual.label}</strong>
-              <div style={{ fontSize: '.7rem', color: 'var(--adm-text-muted)' }}>{atual.group} · {atual.customized ? 'personalizado' : 'original'}</div></div>
+            <div style={{ marginTop: 12 }}><strong style={{ fontSize: '.9rem' }}>{atual.group.split(' — ').pop()}: {atual.label}</strong>
+              <div style={{ fontSize: '.7rem', color: 'var(--adm-text-muted)' }}>{atual.group} · {atual.emRascunho ? 'em rascunho' : atual.customized ? 'personalizado' : 'original'}</div></div>
 
             {atual.type === 'image' ? (
               <div style={{ marginTop: 12 }}>
@@ -129,10 +153,45 @@ export function VisualEditor() {
               <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={salvando || !mudou || !valor.trim()} onClick={() => salvar(valor)}>{salvando ? 'Salvando…' : 'Salvar'}</button>
               {atual.customized && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} disabled={salvando} onClick={() => salvar('')}><RotateCcw size={13} /> Restaurar padrão</button>}
             </div>
-            <p style={{ fontSize: '.7rem', color: 'var(--adm-text-muted)', marginTop: 10 }}>Ao salvar, a alteração vai para o site na hora. Rascunhos e versões chegam na próxima fase.</p>
+            <p style={{ fontSize: '.7rem', color: 'var(--adm-text-muted)', marginTop: 10 }}>Salvar guarda no rascunho: só aparece na prévia. Para ir ao site, use Publicar.</p>
           </>
         )}
       </div>
+      {painel && (
+        <div className={styles.modalOverlay} onClick={fechar}>
+          <div className={`${styles.modal} ${painel === 'versoes' ? styles.modalLarge : ''}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}><div className={styles.modalTitle}>{painel === 'publicar' ? 'Publicar alterações' : painel === 'descartar' ? 'Descartar rascunho' : painel === 'original' ? 'Voltar ao original' : 'Histórico de versões'}</div></div>
+            <div className={styles.modalBody}>
+              {painel === 'publicar' && (<>
+                <p style={{ fontSize: '.85rem' }}>{alteracoes} alteração(ões) vão ao ar agora para todos os visitantes. Uma versão é salva e você poderá voltar a ela.</p>
+                <label className={styles.formLabel}>Observação (opcional)</label>
+                <input data-testid="nota-publicacao" className={styles.formInput} value={nota} onChange={e => setNota(e.target.value)} placeholder="Ex.: novo texto do manifesto" maxLength={200} />
+              </>)}
+              {painel === 'descartar' && <p style={{ fontSize: '.85rem' }}>Descartar as {alteracoes} alteração(ões) em rascunho? O site publicado não é afetado.</p>}
+              {painel === 'original' && <p style={{ fontSize: '.85rem' }}>Isso coloca no rascunho todos os textos e imagens do padrão original. Nada vai ao ar até você publicar.</p>}
+              {painel === 'versoes' && (versoes.length === 0
+                ? <p style={{ fontSize: '.85rem', color: 'var(--adm-text-muted)' }}>Ainda não há versões. Elas aparecem a cada publicação.</p>
+                : <div>{versoes.map((v, i) => (
+                    <div key={v.id} data-testid="versao" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--adm-border)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '.85rem' }}>{v.note || 'Publicação'}{i === 0 ? ' · no ar agora' : ''}</div>
+                        <div style={{ fontSize: '.72rem', color: 'var(--adm-text-muted)' }}>{quando(v.created_at)} · {v.created_by || '—'} · {v.changed} campo(s) alterado(s)</div>
+                      </div>
+                      {i > 0 && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} disabled={ocupado} onClick={() => executar(async () => { const r = await api.admin.restoreContentVersion(v.id); return r.diferencas ? `Versão carregada no rascunho (${r.diferencas} diferença(s)). Confira e publique.` : 'Essa versão é igual ao que está no ar.'; })}>Restaurar no rascunho</button>}
+                    </div>))}
+                    <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} style={{ marginTop: 12 }} onClick={() => setPainel('original')}>Voltar tudo ao original…</button>
+                  </div>)}
+              {erro && <div style={{ color: '#e57373', marginTop: 10, fontSize: '.82rem' }}>{erro}</div>}
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={fechar}>{painel === 'versoes' ? 'Fechar' : 'Cancelar'}</button>
+              {painel === 'publicar' && <button data-testid="confirmar-publicar" className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={ocupado} onClick={() => executar(async () => { const r = await api.admin.publishContent(nota); return `${r.publicados} alteração(ões) publicada(s) no site.`; })}>{ocupado ? 'Publicando…' : 'Publicar agora'}</button>}
+              {painel === 'descartar' && <button className={`${styles.btnSmall} ${styles.btnSmallDanger}`} disabled={ocupado} onClick={() => executar(async () => { await api.admin.discardContentDraft(); return 'Rascunho descartado.'; })}>Descartar</button>}
+              {painel === 'original' && <button className={`${styles.btnSmall} ${styles.btnSmallPrimary}`} disabled={ocupado} onClick={() => executar(async () => { const r = await api.admin.resetContentDraft(); return r.diferencas ? `Original carregado no rascunho (${r.diferencas} campo(s)). Confira e publique.` : 'O site já está no original.'; })}>Carregar original no rascunho</button>}
+            </div>
+          </div>
+        </div>
+      )}
       {biblioteca && <MediaPicker onPick={u => setValor(u)} onClose={() => setBiblioteca(false)} />}
     </div>
   );

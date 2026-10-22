@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, type Category, type Banner } from '../services/api';
+import { emModoEditor } from '../features/editor/modo';
 import { CONTENT_DEFAULTS, CONTATO_PADRAO } from '../content/siteContentDefaults';
 
 // Categorias padrão: usadas só se o servidor ainda não respondeu (a loja nunca fica sem menu).
@@ -34,7 +35,9 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Record<string, string>>({});
 
   const refreshContent = useCallback(async () => {
-    const [cont, bans, sets] = await Promise.allSettled([api.content.get(), api.banners.list(), api.settings.get()]);
+    // Dentro do editor, o site mostra o rascunho; fora dele, só o que está publicado.
+    const conteudo = emModoEditor() ? api.admin.getContentPreview().catch(() => api.content.get()) : api.content.get();
+    const [cont, bans, sets] = await Promise.allSettled([conteudo, api.banners.list(), api.settings.get()]);
     if (cont.status === 'fulfilled' && cont.value) setContent({ ...CONTENT_DEFAULTS, ...cont.value });
     if (bans.status === 'fulfilled' && Array.isArray(bans.value)) setHeroBanner(bans.value[0] || null);
     if (sets.status === 'fulfilled' && sets.value) setSettings(sets.value);

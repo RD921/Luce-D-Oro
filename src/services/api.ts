@@ -492,6 +492,18 @@ export const api = {
     getContent: () =>
       request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
 
+    getContentDraft: () =>
+      request<{ campos: Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean }>; alteracoes: number }>('/api/admin/content/draft'),
+    getContentPreview: () => request<Record<string, string>>('/api/admin/content/preview'),
+    saveContentDraft: (values: Record<string, string>) =>
+      request<{ success: boolean; pendentes: number }>('/api/admin/content/draft', { method: 'PUT', body: JSON.stringify({ values }) }),
+    discardContentDraft: () => request<{ success: boolean; descartados: number }>('/api/admin/content/draft', { method: 'DELETE' }),
+    publishContent: (note: string) =>
+      request<{ success: boolean; publicados: number; message: string }>('/api/admin/content/publish', { method: 'POST', body: JSON.stringify({ note }) }),
+    getContentVersions: () => request<Array<{ id: number; note: string; changed: number; created_by: string | null; created_at: string }>>('/api/admin/content/versions'),
+    restoreContentVersion: (id: number) => request<{ success: boolean; diferencas: number }>(`/api/admin/content/versions/${id}/restore`, { method: 'POST' }),
+    resetContentDraft: () => request<{ success: boolean; diferencas: number }>('/api/admin/content/reset-draft', { method: 'POST' }),
+
     updateContent: (values: Record<string, string>) =>
       request<{ success: boolean; message: string }>('/api/admin/content', {
         method: 'PUT',

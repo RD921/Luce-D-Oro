@@ -121,7 +121,7 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
         { n: 2, titulo: 'Vários clientes e sites', pronta: false },
         { n: 3, titulo: 'Biblioteca de mídia', pronta: true },
         { n: 4, titulo: 'Editor visual', pronta: true },
-        { n: 5, titulo: 'Rascunhos, versões e publicação', pronta: false },
+        { n: 5, titulo: 'Rascunhos, versões e publicação', pronta: true },
         { n: 6, titulo: 'Auditoria avançada e testes de segurança', pronta: false },
       ],
     });

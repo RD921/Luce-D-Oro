@@ -1,11 +1,6 @@
 import { useEffect } from 'react';
 import { useSite } from '../../context/SiteContext';
-
-// Modo de edição: ativo só quando o site está dentro do editor do painel (iframe da própria loja com ?editor=1).
-// Aqui o site apenas AVISA o painel qual elemento foi clicado; quem salva é o painel, com login e permissão do servidor.
-export const emModoEditor = (): boolean => {
-  try { return window.parent !== window && new URLSearchParams(window.location.search).get('editor') === '1'; } catch { return false; }
-};
+import { emModoEditor } from './modo';
 
 export function EditorBridge() {
   const { refreshContent } = useSite();

@@ -2117,13 +2117,6 @@ const ESTADO_INFO: Record<string, { rotulo: string; cor: string }> = {
 };
 
 function ArchitectureSection({ secao }: { secao: string }) {
-  const SECOES = [
-    { id: 'visao', nome: 'Visão geral' },
-    { id: 'sites', nome: 'Sites e clientes' },
-    { id: 'acesso', nome: 'Segurança e permissões' },
-    { id: 'diag', nome: 'Diagnóstico e logs' },
-    { id: 'versoes', nome: 'Versões e publicação', fase: 5 },
-  ] as const;
   const [d, setD] = useState<ArchitectureOverview | null>(null);
   const [erro, setErro] = useState('');
   const carregar = () => { setErro(''); api.admin.getArchitecture().then(setD).catch((e: any) => setErro(e.message || 'Não foi possível carregar.')); };
@@ -2131,23 +2124,13 @@ function ArchitectureSection({ secao }: { secao: string }) {
 
   const mb = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
   const tempo = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.floor(s / 60)} min`);
-  const atual = SECOES.find(x => x.id === secao);
   if (secao === 'midia') return <MediaLibrary />;
   if (secao === 'editor') return <VisualEditor />;
 
   return (
     <>
-      {atual && 'fase' in atual && (
-        <div className={styles.tableWrapper} style={{ padding: '1.5rem' }}>
-          <div className={styles.sectionTitle}>{atual.nome}</div>
-          <p style={{ color: 'var(--adm-text-muted)', marginTop: '.5rem' }}>
-            Ainda não disponível. Esta área será entregue na fase {atual.fase} do plano de Arquitetura, com funcionamento real (nada de tela de exemplo).
-          </p>
-        </div>
-      )}
-
-      {!(atual && 'fase' in atual) && erro && <div className={styles.emptyState}>{erro}</div>}
-      {!(atual && 'fase' in atual) && !erro && !d && <div className={styles.loader}><div className={styles.spinner} /></div>}
+      {erro && <div className={styles.emptyState}>{erro}</div>}
+      {!erro && !d && <div className={styles.loader}><div className={styles.spinner} /></div>}
 
       {d && secao === 'visao' && (
         <>
