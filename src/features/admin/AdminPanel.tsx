@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Archive, Image, Tag, Settings,
   Shield, X, Plus, Edit2, Trash2, Search,
   AlertTriangle, Users, ArrowUpCircle, ArrowDownCircle,
-  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, FileText, CreditCard, Bell, ChevronDown
+  CheckCircle, XCircle, Truck, Eye, LogOut, Upload, Layers, CreditCard, Bell, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
@@ -123,7 +123,7 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 type TabId = 'dashboard' | 'products' | 'categories' | 'content' | 'orders' | 'stock' | 'banners' | 'coupons' | 'customers' | 'shipping' | 'payments' | 'team' | 'settings' | 'audit' | 'architecture';
 
 // area = nome da área no servidor; owner = só o proprietário vê
-interface Tab { id: TabId; label: string; icon: React.ReactNode; group: string; area?: string; owner?: boolean }
+interface Tab { id: TabId; label: string; icon: React.ReactNode; group: string; area?: string; owner?: boolean; qualquer?: string[] }
 
 const TABS: Tab[] = [
   { id: 'dashboard',  label: 'Dashboard',    icon: <LayoutDashboard size={15} />, group: 'Visão Geral', area: 'dashboard' },
@@ -132,13 +132,11 @@ const TABS: Tab[] = [
   { id: 'orders',     label: 'Pedidos',      icon: <ShoppingCart size={15} />,    group: 'Visão Geral', area: 'pedidos' },
   { id: 'customers',  label: 'Clientes',     icon: <Users size={15} />,           group: 'Visão Geral', area: 'clientes' },
   { id: 'stock',      label: 'Estoque',      icon: <Archive size={15} />,         group: 'Marketing & Loja', area: 'estoque' },
-  { id: 'banners',    label: 'Banners',      icon: <Image size={15} />,           group: 'Marketing & Loja', area: 'banners' },
-  { id: 'content',    label: 'Conteúdo',     icon: <FileText size={15} />,        group: 'Marketing & Loja', area: 'conteudo' },
   { id: 'coupons',    label: 'Cupons',       icon: <Tag size={15} />,             group: 'Sistema', area: 'cupons' },
   { id: 'shipping',   label: 'Entrega',      icon: <Truck size={15} />,           group: 'Sistema', area: 'entrega' },
   { id: 'payments',   label: 'Pagamento',    icon: <CreditCard size={15} />,      group: 'Sistema', area: 'pagamento' },
   { id: 'settings',   label: 'Configurações',icon: <Settings size={15} />,        group: 'Sistema', area: 'configuracoes' },
-  { id: 'architecture', label: 'Arquitetura Adm.', icon: <Layers size={15} />,    group: 'Sistema', area: 'arquitetura' },
+  { id: 'architecture', label: 'Arquitetura Adm.', icon: <Layers size={15} />,    group: 'Sistema', area: 'arquitetura', qualquer: ['arquitetura', 'banners', 'conteudo', 'uploads'] },
   { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
   { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} />,          group: 'Sistema', area: 'auditoria' },
 ];
@@ -161,7 +159,8 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { user, logout, isOwner } = useAuth();
-  const abas = TABS.filter(t => (t.owner ? isOwner : isOwner || Boolean(t.area && user?.areas?.[t.area])));
+  const pode = (area: string) => Boolean(isOwner || user?.areas?.[area]);
+  const abas = TABS.filter(t => (t.owner ? isOwner : isOwner || (t.qualquer ? t.qualquer.some(a => user?.areas?.[a]) : Boolean(t.area && user?.areas?.[t.area]))));
   const [activeTab, setActiveTab] = useState<TabId>(abas[0]?.id ?? 'dashboard');
   const canSettings = abas.some(t => t.id === 'settings');
   const [settingsSub, setSettingsSub] = useState<SettingsSub>('geral');
@@ -299,10 +298,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'dashboard'  && <DashboardTab />}
           {activeTab === 'products'   && <ProductsTab />}
           {activeTab === 'categories' && <CategoriesTab />}
-          {activeTab === 'content'    && <ContentTab />}
           {activeTab === 'orders'     && <OrdersTab />}
           {activeTab === 'stock'      && <StockTab />}
-          {activeTab === 'banners'    && <BannersTab />}
           {activeTab === 'coupons'    && <CouponsTab />}
           {activeTab === 'customers'  && <CustomersTab />}
           {activeTab === 'shipping'   && <ShippingTab />}
@@ -311,7 +308,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'settings'   && <SettingsSection sub={settingsSub} />}
           {activeTab === 'architecture' && (archSection
             ? <><button className={styles.archBack} onClick={() => setArchSection(null)}>← Voltar para Arquitetura Adm.</button><ArchitectureSection secao={archSection} /></>
-            : <ArchitectureHome online={online} onOpenSection={setArchSection} onNavigate={abrirAba} />)}
+            : <ArchitectureHome online={online} onOpenSection={setArchSection} onNavigate={abrirAba} pode={pode} />)}
           {activeTab === 'audit'      && <AuditTab />}
         </div>
       </main>
@@ -2135,13 +2132,16 @@ const ESTADO_INFO: Record<string, { rotulo: string; cor: string }> = {
 function ArchitectureSection({ secao }: { secao: string }) {
   const [d, setD] = useState<ArchitectureOverview | null>(null);
   const [erro, setErro] = useState('');
-  const carregar = () => { setErro(''); api.admin.getArchitecture().then(setD).catch((e: any) => setErro(e.message || 'Não foi possível carregar.')); };
+  const tecnica = ['visao', 'sites', 'acesso', 'diag'].includes(secao);
+  const carregar = () => { if (!tecnica) return; setErro(''); api.admin.getArchitecture().then(setD).catch((e: any) => setErro(e.message || 'Não foi possível carregar.')); };
   useEffect(carregar, []);
 
   const mb = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
   const tempo = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.floor(s / 60)} min`);
   if (secao === 'midia') return <MediaLibrary />;
   if (secao === 'editor') return <VisualEditor />;
+  if (secao === 'conteudo') return <ContentTab />;
+  if (secao === 'banners') return <BannersTab />;
 
   return (
     <>

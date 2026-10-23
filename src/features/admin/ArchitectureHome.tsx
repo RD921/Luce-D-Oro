@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Image as ImageIcon, MousePointer2, FileText, RefreshCw, Users, ShieldCheck, Activity, ArrowRight, Search, Settings, Upload, Shield, Package } from 'lucide-react';
+import { Monitor, Image as ImageIcon, MousePointer2, FileText, Users, ShieldCheck, Activity, ArrowRight, Search, Settings, Upload, Shield, Package, Tag } from 'lucide-react';
 import { api, type ArchitectureOverview } from '../../services/api';
 import styles from './AdminPanel.module.css';
 
@@ -28,24 +28,28 @@ interface Props {
   online: boolean | null;
   onOpenSection: (id: string) => void;
   onNavigate: (tab: string) => void;
+  pode: (area: string) => boolean;
 }
 
-export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
+export function ArchitectureHome({ online, onOpenSection, pode }: Props) {
   const [d, setD] = useState<ArchitectureOverview | null>(null);
   const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
-  useEffect(() => { api.admin.getArchitecture().then(setD).catch((e: Error) => setErro(e.message || 'Não foi possível carregar.')); }, []);
+  const veTudo = pode('arquitetura');
+  useEffect(() => { if (veTudo) api.admin.getArchitecture().then(setD).catch((e: Error) => setErro(e.message || 'Não foi possível carregar.')); }, [veTudo]);
 
-  const cartoes: Array<{ icon: React.ReactNode; titulo: string; desc: string; abre: () => void; breve?: string }> = [
-    { icon: <Monitor size={26} strokeWidth={1.3} />, titulo: 'Visão geral', desc: 'Acompanhe o estado do site, os números da loja e as verificações técnicas.', abre: () => onOpenSection('visao') },
-    { icon: <ImageIcon size={26} strokeWidth={1.3} />, titulo: 'Biblioteca de mídia', desc: 'Gerencie imagens, arquivos e recursos visuais.', abre: () => onOpenSection('midia') },
-    { icon: <MousePointer2 size={26} strokeWidth={1.3} />, titulo: 'Editor visual', desc: 'Edite o conteúdo do site de forma simples e intuitiva.', abre: () => onOpenSection('editor') },
-    { icon: <FileText size={26} strokeWidth={1.3} />, titulo: 'Páginas e conteúdo', desc: 'Organize páginas, seções e textos do site.', abre: () => onNavigate('content') },
-    { icon: <RefreshCw size={26} strokeWidth={1.3} />, titulo: 'Versões e publicação', desc: 'Controle rascunhos, histórico e publique alterações.', abre: () => onOpenSection('editor') },
-    { icon: <Users size={26} strokeWidth={1.3} />, titulo: 'Sites e clientes', desc: 'Gerencie múltiplos sites e clientes em um só lugar.', abre: () => onOpenSection('sites') },
-    { icon: <ShieldCheck size={26} strokeWidth={1.3} />, titulo: 'Segurança e permissões', desc: 'Configure funções, acessos e proteja seus dados.', abre: () => onOpenSection('acesso') },
-    { icon: <Activity size={26} strokeWidth={1.3} />, titulo: 'Diagnóstico e auditoria', desc: 'Monitore logs, integrações e o estado do sistema.', abre: () => onOpenSection('diag') },
+  const todos: Array<{ icon: React.ReactNode; titulo: string; desc: string; abre: () => void; breve?: string; area: string }> = [
+    { icon: <Monitor size={26} strokeWidth={1.3} />, titulo: 'Visão geral', desc: 'Acompanhe o estado do site, os números da loja e as verificações técnicas.', abre: () => onOpenSection('visao'), area: 'arquitetura' },
+    { icon: <ImageIcon size={26} strokeWidth={1.3} />, titulo: 'Biblioteca de mídia', desc: 'Gerencie imagens, arquivos e recursos visuais.', abre: () => onOpenSection('midia'), area: 'uploads' },
+    { icon: <MousePointer2 size={26} strokeWidth={1.3} />, titulo: 'Editor visual', desc: 'Edite textos e imagens do site com rascunhos, versões e publicação.', abre: () => onOpenSection('editor'), area: 'conteudo' },
+    { icon: <FileText size={26} strokeWidth={1.3} />, titulo: 'Páginas e conteúdo', desc: 'Organize páginas, seções e textos do site.', abre: () => onOpenSection('conteudo'), area: 'conteudo' },
+    { icon: <Tag size={26} strokeWidth={1.3} />, titulo: 'Banners', desc: 'Faixas e imagens de destaque da página inicial.', abre: () => onOpenSection('banners'), area: 'banners' },
+    { icon: <Users size={26} strokeWidth={1.3} />, titulo: 'Sites e clientes', desc: 'Gerencie múltiplos sites e clientes em um só lugar.', abre: () => onOpenSection('sites'), area: 'arquitetura' },
+    { icon: <ShieldCheck size={26} strokeWidth={1.3} />, titulo: 'Segurança e permissões', desc: 'Configure funções, acessos e proteja seus dados.', abre: () => onOpenSection('acesso'), area: 'arquitetura' },
+    { icon: <Activity size={26} strokeWidth={1.3} />, titulo: 'Diagnóstico e auditoria', desc: 'Monitore logs, integrações e o estado do sistema.', abre: () => onOpenSection('diag'), area: 'arquitetura' },
   ];
+
+  const cartoes = todos.filter(c => pode(c.area));
 
   const host = typeof window !== 'undefined' ? window.location.host : '';
   const nomeSite = d?.site.nome || "Luce D'Oro";
@@ -87,6 +91,7 @@ export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
         ))}
       </div>
 
+      {veTudo && (<>
       <div className={styles.archPanel}>
         <div className={styles.archPanelHead}>
           <span className={styles.archPanelTitle}>Sites e clientes</span>
@@ -160,6 +165,7 @@ export function ArchitectureHome({ online, onOpenSection, onNavigate }: Props) {
           </div>
         </div>
       </div>
+      </>)}
     </>
   );
 }
