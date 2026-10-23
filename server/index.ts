@@ -18,19 +18,28 @@ import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
 import { registerAdminCommerce, ESTOQUE_SQL, temVariantes, estoqueDaVariante, baixarEstoque, variantesDe, resolverEntrega, resolverPagamento, limiteFreteGratis } from './adminCommerce.js';
 import { registerAdminArchitecture } from './adminArchitecture.js';
+import { cabecalhosSeguranca, origemPermitida, limitarFalhas } from './seguranca.js';
 import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = 3001;
 
+app.use(cabecalhosSeguranca);
 app.use(
   cors({
-    origin: true,
+    origin: origemPermitida,
     credentials: true,
   })
 );
+
+// Limite de tentativas erradas (força bruta): por e-mail+IP e também por IP
+const ipDe = (req: Request) => req.ip || req.socket.remoteAddress || 'desconhecido';
+const limiteLoginConta = limitarFalhas({ janelaMs: 15 * 60_000, max: 8, chave: (req) => `c:${ipDe(req)}:${String(req.body?.email || '').trim().toLowerCase()}`, mensagem: 'Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.' });
+const limiteLoginIp = limitarFalhas({ janelaMs: 15 * 60_000, max: 40, chave: (req) => `i:${ipDe(req)}`, mensagem: 'Muitas tentativas erradas deste endereço. Aguarde alguns minutos.' });
+const limiteChaveDono = limitarFalhas({ janelaMs: 15 * 60_000, max: 5, chave: (req) => `d:${ipDe(req)}`, mensagem: 'Muitas tentativas com chave inválida. Aguarde alguns minutos.', contar: [400, 401, 403] });
 // O upload de imagens tem leitor próprio (aceita arquivos maiores), por isso é pulado aqui
 app.use((req, res, next) => (req.path === '/api/admin/uploads' || req.path.startsWith('/api/admin/media') ? next() : express.json()(req, res, next)));
 app.use(cookieParser());
@@ -141,7 +150,7 @@ app.post('/api/auth/validate-email', (req: Request, res: Response) => {
 });
 
 // Login
-app.post('/api/auth/login', (req: Request, res: Response) => {
+app.post('/api/auth/login', limiteLoginIp, limiteLoginConta, (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -184,6 +193,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   res.cookie('session_token', sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: process.env.COOKIE_SECURE === '1',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
@@ -257,6 +267,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   res.cookie('session_token', sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: process.env.COOKIE_SECURE === '1',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
@@ -355,7 +366,7 @@ app.get('/api/admin/setup/status', (req: Request, res: Response) => {
 });
 
 // Claim & Activate Owner Privileges via Single-Use Setup Key
-app.post('/api/admin/setup/verify-owner', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+app.post('/api/admin/setup/verify-owner', limiteChaveDono, authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const cleanEmail = user.email.trim().toLowerCase();
   const authorizedEmail = AUTHORIZED_OWNER.email.toLowerCase();

@@ -51,7 +51,7 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
   migrarExtras();
 
   // Arquivos enviados ficam públicos (são fotos da vitrine)
-  app.use('/uploads', express.static(UPLOAD_DIR, { index: false, dotfiles: 'deny', setHeaders: (r) => r.setHeader('Cache-Control', 'public, max-age=0, must-revalidate') }));
+  app.use('/uploads', express.static(UPLOAD_DIR, { index: false, dotfiles: 'deny', setHeaders: (r) => { r.setHeader('Cache-Control', 'public, max-age=0, must-revalidate'); r.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; sandbox"); } }));
 
   // ---------- Upload de imagem ----------
   // Corpo: { data: "<base64 ou data:image/...;base64,...>" }
