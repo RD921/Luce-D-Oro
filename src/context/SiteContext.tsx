@@ -16,6 +16,8 @@ interface SiteContextValue {
   refreshCategories: () => Promise<void>;
   /** Texto/imagem editável da loja (usa o padrão se nada foi trocado no painel) */
   c: (key: string) => string;
+  /** Propriedades de um elemento editável pelo editor visual (marcação + posição arrastada) */
+  ed: (key: string) => { 'data-edit-key': string; style?: React.CSSProperties };
   /** Banner principal (o primeiro ativo, na ordem do painel) */
   heroBanner: Banner | null;
   /** Configurações da loja (aba Configurações do painel) */
@@ -29,6 +31,14 @@ const SiteContext = createContext<SiteContextValue | null>(null);
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<Category[]>(CATEGORIAS_PADRAO);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
+  const [celular, setCelular] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const f = () => setCelular(mq.matches);
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
 
   const [content, setContent] = useState<Record<string, string>>(CONTENT_DEFAULTS);
   const [heroBanner, setHeroBanner] = useState<Banner | null>(null);
@@ -62,6 +72,12 @@ export function SiteProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SiteContextValue>(() => {
     const c = (key: string) => content[key] ?? CONTENT_DEFAULTS[key] ?? '';
+    const ed = (key: string) => {
+      const bruto = (celular ? content[`posm_${key}`] : content[`pos_${key}`]) || '';
+      const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(bruto);
+      if (!m) return { 'data-edit-key': key };
+      return { 'data-edit-key': key, style: { position: 'relative' as const, left: `${m[1]}%`, top: `${m[2]}px` } };
+    };
     // As Configurações usam nomes novos (store_*), mas lojas antigas têm os nomes antigos (contact_*): aceita os dois.
     const pega = (...chaves: string[]) => chaves.map((k) => (settings[k] || '').trim()).find(Boolean) || '';
     const contato = {
@@ -71,8 +87,8 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       instagram: pega('store_instagram', 'instagram'),
       endereco: pega('store_address'),
     };
-    return { categories, categoriesLoaded, refreshCategories, c, heroBanner, settings, contato, refreshContent };
-  }, [categories, categoriesLoaded, refreshCategories, content, heroBanner, settings, refreshContent]);
+    return { categories, categoriesLoaded, refreshCategories, c, ed, heroBanner, settings, contato, refreshContent };
+  }, [categories, categoriesLoaded, refreshCategories, content, celular, heroBanner, settings, refreshContent]);
   return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>;
 }
 

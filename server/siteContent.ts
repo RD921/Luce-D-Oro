@@ -15,7 +15,7 @@ function lerPersonalizados(): Record<string, string> {
 
 // Imagens só podem ser da própria loja (/images, /uploads) ou um link https — nunca "javascript:" etc.
 function imagemOuTextoOk(f: { type: string }, v: string): boolean {
-  return typeof v === 'string' && v.length <= 2000 && (f.type !== 'image' || imagemValida(v));
+  return typeof v === 'string' && v.length <= 2000 && (f.type !== 'image' || imagemValida(v)) && (f.type !== 'position' || /^-?\d{1,3}(\.\d{1,2})?,-?\d{1,4}(\.\d{1,2})?$/.test(v));
 }
 
 function imagemValida(v: string): boolean {
@@ -58,6 +58,10 @@ export function registerSiteContent(app: Express, painel: (a: 'conteudo') => Req
       if (typeof bruto !== 'string') return { erro: `O campo "${campo.label}" precisa ser texto.` };
       const v = bruto.trim();
       if (v.length > 2000) return { erro: `O campo "${campo.label}" passou de 2000 caracteres.` };
+      if (campo.type === 'position' && v) {
+        const m = /^(-?\d{1,3}(?:\.\d{1,2})?),(-?\d{1,4}(?:\.\d{1,2})?)$/.exec(v);
+        if (!m || Math.abs(Number(m[1])) > 100 || Math.abs(Number(m[2])) > 2000) return { erro: `Posição inválida em "${campo.label}".` };
+      }
       if (campo.type === 'image' && v && !imagemValida(v)) return { erro: `O campo "${campo.label}" precisa ser uma foto enviada pelo painel ou um link https.` };
       aplicar.push([k, v === '' || v === campo.def ? null : v]);
     }

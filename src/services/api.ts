@@ -493,7 +493,7 @@ export const api = {
 
     // ---- Conteúdo da loja (textos e imagens) ----
     getContent: () =>
-      request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
+      request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image' | 'position'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
 
     getSeo: () => request<{ valores: Record<string, string>; padrao: Record<string, string> }>('/api/admin/seo'),
     saveSeo: (v: Record<string, string>) => request<{ success: boolean; valores: Record<string, string> }>('/api/admin/seo', { method: 'PUT', body: JSON.stringify(v) }),
@@ -502,7 +502,7 @@ export const api = {
     markNotificationsRead: () => request<{ success: boolean }>('/api/admin/notifications/read', { method: 'POST' }),
     getIntegrations: () => request<{ verificadoEm: string; itens: Array<{ id: string; nome: string; estado: 'ok' | 'falha' | 'atencao' | 'nao_integrada'; detalhe: string }> }>('/api/admin/integrations'),
     getContentDraft: () =>
-      request<{ campos: Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean }>; alteracoes: number }>('/api/admin/content/draft'),
+      request<{ campos: Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image' | 'position'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean }>; alteracoes: number }>('/api/admin/content/draft'),
     getContentPreview: () => request<Record<string, string>>('/api/admin/content/preview'),
     saveContentDraft: (values: Record<string, string>) =>
       request<{ success: boolean; pendentes: number }>('/api/admin/content/draft', { method: 'PUT', body: JSON.stringify({ values }) }),

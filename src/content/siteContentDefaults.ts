@@ -2,7 +2,7 @@
 // Este arquivo é a ÚNICA fonte dos valores padrão: o site e o servidor leem daqui.
 // Não importe nada neste arquivo (ele é usado pelos dois lados).
 
-export type ContentType = 'text' | 'textarea' | 'image';
+export type ContentType = 'text' | 'textarea' | 'image' | 'position';
 
 export interface ContentField {
   key: string;
@@ -12,7 +12,7 @@ export interface ContentField {
   def: string;
 }
 
-export const CONTENT_FIELDS: ContentField[] = [
+const CAMPOS_BASE: ContentField[] = [
   // ---- Identidade visual e imagens padrão ----
   { key: 'logo_header', group: 'Identidade visual', label: 'Logo do cabeçalho', type: 'image', def: '/images/logo-crop.png' },
   { key: 'logo_footer', group: 'Identidade visual', label: 'Logo do rodapé', type: 'image', def: '/images/logo-crop.png' },
@@ -67,6 +67,24 @@ export const CONTENT_FIELDS: ContentField[] = [
   { key: 'footer_inst2', group: 'Rodapé', label: 'Institucional — item 2', type: 'text', def: 'Nossos Mestres Ourives' },
   { key: 'footer_inst3', group: 'Rodapé', label: 'Institucional — item 3', type: 'text', def: 'Política de Privacidade' },
   { key: 'footer_inst4', group: 'Rodapé', label: 'Institucional — item 4', type: 'text', def: 'Termos de Uso' },
+];
+
+// Elementos que o visitante vê e o editor visual pode arrastar. Cada um ganha dois campos de posição:
+//   pos_<chave>  = deslocamento no computador   |   posm_<chave> = deslocamento no celular
+// Valor "x,y": x em % da largura do bloco onde o elemento está, y em pixels. Vazio = posição original.
+export const ELEMENTOS_ARRASTAVEIS = [
+  'logo_header', 'logo_footer', 'logo_signature', 'footer_hours',
+  'materials_tag', 'materials_title', 'materials_lead', 'materials_image', 'materials_pill',
+  'story_tag', 'story_title', 'story_p1', 'story_p2', 'story_signature',
+] as const;
+
+const rotuloDe = (k: string) => CAMPOS_BASE.find((f) => f.key === k)?.label ?? k;
+export const CONTENT_FIELDS: ContentField[] = [
+  ...CAMPOS_BASE,
+  ...ELEMENTOS_ARRASTAVEIS.flatMap((k): ContentField[] => [
+    { key: `pos_${k}`, group: 'Posição (computador)', label: `Posição — ${rotuloDe(k)}`, type: 'position', def: '' },
+    { key: `posm_${k}`, group: 'Posição (celular)', label: `Posição no celular — ${rotuloDe(k)}`, type: 'position', def: '' },
+  ]),
 ];
 
 export const CONTENT_DEFAULTS: Record<string, string> = Object.fromEntries(CONTENT_FIELDS.map((f) => [f.key, f.def]));

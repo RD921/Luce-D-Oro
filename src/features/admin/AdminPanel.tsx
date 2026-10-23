@@ -1416,7 +1416,7 @@ function ContentTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const lista = await api.admin.getContent();
+      const lista = (await api.admin.getContent()).filter(c => c.type !== 'position');
       setCampos(lista);
       setValores(Object.fromEntries(lista.map(c => [c.key, c.value])));
     } catch (e: any) { setMsg(e.message); }

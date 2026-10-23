@@ -9,7 +9,7 @@ interface HomeViewProps {
 }
 
 export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
-  const { categories, c, heroBanner } = useSite();
+  const { categories, c, ed, heroBanner } = useSite();
 
   // Faixa principal: o primeiro banner ativo do painel (Banners). Sem banner, mostra o texto original.
   const hero = {
@@ -50,17 +50,17 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
         <div className="container">
           <div className={styles.processGrid}>
             <div className={styles.processText}>
-              <span className={styles.eyebrow} data-edit-key="materials_tag">{c('materials_tag')}</span>
-              <h2 className={styles.processTitle} data-edit-key="materials_title">{c('materials_title')}</h2>
-              <p className={styles.processLead} data-edit-key="materials_lead">{c('materials_lead')}</p>
+              <span className={styles.eyebrow} {...ed('materials_tag')}>{c('materials_tag')}</span>
+              <h2 className={styles.processTitle} {...ed('materials_title')}>{c('materials_title')}</h2>
+              <p className={styles.processLead} {...ed('materials_lead')}>{c('materials_lead')}</p>
               <button onClick={() => onNavigateCategory(categories[0]?.slug || 'pulseiras')} className={styles.linkCta}>
                 <span>Ver coleções</span>
                 <ArrowRight size={16} strokeWidth={1.2} />
               </button>
             </div>
             <div className={styles.processImage}>
-              <img data-edit-key="materials_image" src={c('materials_image')} alt="Ourivesaria artesanal" />
-              <span className={styles.processCaption} data-edit-key="materials_pill">{c('materials_pill')}</span>
+              <img {...ed('materials_image')} src={c('materials_image')} alt="Ourivesaria artesanal" />
+              <span className={styles.processCaption} {...ed('materials_pill')}>{c('materials_pill')}</span>
             </div>
           </div>
         </div>
@@ -70,17 +70,17 @@ export const HomeView = ({ onNavigateCategory }: HomeViewProps) => {
       <section className={styles.brandStorySection}>
         <div className="container">
           <div className={styles.storyCard}>
-            <span className={styles.storyTag} data-edit-key="story_tag">{c('story_tag')}</span>
-            <h2 className={styles.storyTitle} data-edit-key="story_title">{c('story_title')}</h2>
-            <p className={styles.storyParagraph} data-edit-key="story_p1">
+            <span className={styles.storyTag} {...ed('story_tag')}>{c('story_tag')}</span>
+            <h2 className={styles.storyTitle} {...ed('story_title')}>{c('story_title')}</h2>
+            <p className={styles.storyParagraph} {...ed('story_p1')}>
               {c('story_p1')}
             </p>
-            <p className={styles.storyParagraphSecondary} data-edit-key="story_p2">
+            <p className={styles.storyParagraphSecondary} {...ed('story_p2')}>
               {c('story_p2')}
             </p>
             <div className={styles.signature}>
-              <img data-edit-key="logo_signature" src={c('logo_signature')} alt="Luce D'Oro" className={styles.signatureLogo} />
-              <span className={styles.signatureText} data-edit-key="story_signature">{c('story_signature')}</span>
+              <img {...ed('logo_signature')} src={c('logo_signature')} alt="Luce D'Oro" className={styles.signatureLogo} />
+              <span className={styles.signatureText} {...ed('story_signature')}>{c('story_signature')}</span>
             </div>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { MediaPicker } from './MediaLibrary';
 import styles from './AdminPanel.module.css';
 
-type Campo = { key: string; label: string; group: string; type: 'text' | 'textarea' | 'image'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean };
+type Campo = { key: string; label: string; group: string; type: 'text' | 'textarea' | 'image' | 'position'; def: string; value: string; publicado: string; emRascunho: boolean; customized: boolean };
 type Versao = { id: number; note: string; changed: number; created_by: string | null; created_at: string };
 const quando = (s: string) => { const d = new Date(s.replace(' ', 'T') + 'Z'); return isNaN(d.getTime()) ? s : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); };
 
@@ -41,6 +41,7 @@ export function VisualEditor() {
     const ouvir = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
       if (e.data?.tipo === 'ld-editar' && typeof e.data.key === 'string') escolher(e.data.key, campos);
+      if (e.data?.tipo === 'ld-mover' && typeof e.data.key === 'string' && Number.isFinite(e.data.x) && Number.isFinite(e.data.y)) void moverElemento(e.data.key, e.data.x, e.data.y, !!e.data.celular);
     };
     window.addEventListener('message', ouvir);
     return () => window.removeEventListener('message', ouvir);
@@ -55,6 +56,31 @@ export function VisualEditor() {
     setOcupado(false);
   };
   const abrirVersoes = async () => { setPainel('versoes'); setErro(''); try { setVersoes(await api.admin.getContentVersions()); } catch (e: any) { setErro(e.message || 'Não foi possível carregar o histórico.'); } };
+
+  // Posição arrastada no site → rascunho (computador: pos_*, celular: posm_*)
+  const moverElemento = async (key: string, x: number, y: number, ehCelular: boolean) => {
+    const campo = `${ehCelular ? 'posm_' : 'pos_'}${key}`;
+    setErro(''); setMsg('');
+    try {
+      await api.admin.saveContentDraft({ [campo]: `${Math.max(-100, Math.min(100, x))},${Math.max(-2000, Math.min(2000, y))}` });
+      const r = await api.admin.getContentDraft();
+      setCampos(r.campos); setAlteracoes(r.alteracoes);
+      setChave(key); setValor(r.campos.find(c => c.key === key)?.value ?? '');
+      setMsg(`Posição salva no rascunho (${ehCelular ? 'celular' : 'computador'}). Publique para ir ao ar.`);
+    } catch (e: any) { setErro(e.message || 'Não foi possível salvar a posição.'); }
+    atualizarPrevia();
+  };
+  const restaurarPosicao = async (campo: string) => {
+    setErro(''); setMsg('');
+    try {
+      await api.admin.saveContentDraft({ [campo]: '' });
+      const r = await api.admin.getContentDraft();
+      setCampos(r.campos); setAlteracoes(r.alteracoes);
+      setMsg('Posição original restaurada (no rascunho).');
+    } catch (e: any) { setErro(e.message || 'Não foi possível restaurar.'); }
+    atualizarPrevia();
+  };
+  const posTexto = (k: string) => { const v = campos.find(c => c.key === k)?.value || ''; const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(v); return m ? `${m[1]}% · ${m[2]}px` : ''; };
 
   const atual = campos.find(c => c.key === chave) || null;
   const mudou = !!atual && valor !== atual.value;
@@ -81,7 +107,8 @@ export function VisualEditor() {
     setEnviando(false);
   };
 
-  const grupos = Array.from(new Set(campos.map(c => c.group)));
+  const visiveis = campos.filter(c => c.type !== 'position');
+  const grupos = Array.from(new Set(visiveis.map(c => c.group)));
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }}>
@@ -96,7 +123,7 @@ export function VisualEditor() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
           <button className={`${styles.btnSmall} ${celular ? styles.btnSmallGhost : styles.btnSmallPrimary}`} onClick={() => setCelular(false)}><Monitor size={13} /> Computador</button>
           <button className={`${styles.btnSmall} ${celular ? styles.btnSmallPrimary : styles.btnSmallGhost}`} onClick={() => setCelular(true)}><Smartphone size={13} /> Celular</button>
-          <span style={{ flex: 1, color: 'var(--adm-text-muted)', fontSize: '.78rem' }}>Clique em um elemento com contorno tracejado para editar.</span>
+          <span style={{ flex: 1, color: 'var(--adm-text-muted)', fontSize: '.78rem' }}>Clique para editar o texto/imagem. Arraste para mudar de lugar.</span>
           <a className={`${styles.btnSmall} ${styles.btnSmallGhost}`} href="/" target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Abrir site</a>
         </div>
         <div style={{ background: '#05090c', border: '1px solid var(--adm-border)', borderRadius: 10, padding: celular ? 12 : 0, display: 'flex', justifyContent: 'center' }}>
@@ -116,7 +143,7 @@ export function VisualEditor() {
             {grupos.map(g => (
               <div key={g} style={{ marginTop: 10 }}>
                 <div style={{ fontSize: '.68rem', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--adm-text-muted)' }}>{g}</div>
-                {campos.filter(c => c.group === g).map(c => (
+                {visiveis.filter(c => c.group === g).map(c => (
                   <button key={c.key} data-testid="campo-lista" onClick={() => escolher(c.key, campos)}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 0, color: 'inherit', padding: '5px 0', fontSize: '.8rem', cursor: 'pointer' }}>
                     {c.label}{c.emRascunho ? ' ● rascunho' : c.customized ? ' •' : ''}
@@ -145,6 +172,18 @@ export function VisualEditor() {
               <textarea data-testid="editor-input" className={styles.formInput} style={{ marginTop: 12, minHeight: 140 }} value={valor} onChange={e => setValor(e.target.value)} />
             ) : (
               <input data-testid="editor-input" className={styles.formInput} style={{ marginTop: 12 }} value={valor} onChange={e => setValor(e.target.value)} />
+            )}
+
+            {campos.some(c => c.key === `pos_${atual.key}`) && (
+              <div data-testid="painel-posicao" style={{ marginTop: 14, padding: 10, border: '1px solid var(--adm-border)', borderRadius: 8, fontSize: '.78rem' }}>
+                <strong>Posição</strong> <span style={{ color: 'var(--adm-text-muted)' }}>— arraste o elemento no site para mover</span>
+                {([['pos_', 'Computador'], ['posm_', 'Celular']] as const).map(([pref, nome]) => (
+                  <div key={pref} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <span style={{ flex: 1 }}>{nome}: {posTexto(pref + atual.key) || 'original'}</span>
+                    {posTexto(pref + atual.key) && <button className={`${styles.btnSmall} ${styles.btnSmallGhost}`} onClick={() => restaurarPosicao(pref + atual.key)}><RotateCcw size={12} /> Restaurar</button>}
+                  </div>
+                ))}
+              </div>
             )}
 
             {erro && <div style={{ color: '#e57373', marginTop: 10, fontSize: '.82rem' }}>{erro}</div>}
