@@ -10,8 +10,9 @@ const cli = await login('c@x.com', 'x');
 
 // 1) Toda rota /api/admin exige login e papel
 const rotas = new Set();
-for (const f of fs.readdirSync('server').filter((n) => n.endsWith('.ts'))) {
-  const src = fs.readFileSync(`server/${f}`, 'utf8');
+const arquivos = [...fs.readdirSync('server').filter((n) => n.endsWith('.ts')).map((n) => `server/${n}`), ...fs.readdirSync('server/rotas').filter((n) => n.endsWith('.ts')).map((n) => `server/rotas/${n}`)];
+for (const f of arquivos) {
+  const src = fs.readFileSync(f, 'utf8');
   for (const m of src.matchAll(/app\.(get|post|put|patch|delete)\(\s*'(\/api\/admin[^']*)'/g)) rotas.add(`${m[1].toUpperCase()} ${m[2]}`);
 }
 const PUBLICAS = new Set(['GET /api/admin/setup/status']);

@@ -132,7 +132,7 @@ export function registerSites(app: Express, painel: (a: Area) => RequestHandler)
     let id = slug(r.v.nome as string); let n = 2;
     while (existe.get(id)) id = `${slug(r.v.nome as string)}-${n++}`;
     db.prepare('INSERT INTO sites (id, nome, cliente, dominio, tipo, status) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, r.v.nome, r.v.cliente ?? '', r.v.dominio ?? null, r.v.tipo ?? 'Loja', r.v.status ?? 'em_construcao');
+      .run(id, r.v.nome as string, r.v.cliente ?? '', r.v.dominio ?? null, r.v.tipo ?? 'Loja', r.v.status ?? 'em_construcao');
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'SITE_CREATED', entity: 'SITE', entityId: id, details: { nome: r.v.nome, dominio: r.v.dominio ?? null } });
     res.status(201).json(db.prepare('SELECT * FROM sites WHERE id = ?').get(id));
