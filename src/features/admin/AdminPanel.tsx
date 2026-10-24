@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSite } from '../../context/SiteContext';
-import { api, type ArchitectureOverview, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
+import { siteAtual, definirSiteAtual } from '../../services/siteAtual';
+import { api, type AdminSite, type ArchitectureOverview, type Category, type Product, type Order, type Banner, type Coupon, type StockMovement, type AuditLog, type AdminAlert, type AdminDashboardData, type DashboardInsights, type AdminShipping, type AdminPayment, type StockProduct } from '../../services/api';
 import { ArchitectureHome } from './ArchitectureHome';
 import { MediaLibrary, MediaPicker } from './MediaLibrary';
 import { VisualEditor } from './VisualEditor';
@@ -165,6 +166,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const canSettings = abas.some(t => t.id === 'settings');
   const [settingsSub, setSettingsSub] = useState<SettingsSub>('geral');
   const [archSection, setArchSection] = useState<string | null>(null);
+  const [siteId, setSiteId] = useState<string>(() => siteAtual());
+  const [sites, setSites] = useState<AdminSite[]>([]);
+  const carregarSites = useCallback(() => {
+    if (!(isOwner || user?.areas?.conteudo)) return Promise.resolve();
+    return api.admin.getSites().then(l => { setSites(l); if (!l.some(x => x.id === siteAtual())) { definirSiteAtual('luce-d-oro'); setSiteId('luce-d-oro'); } }).catch(() => {});
+  }, [isOwner, user]);
+  useEffect(() => { void carregarSites(); }, [carregarSites]);
+  const trocarSite = (id: string) => { definirSiteAtual(id); setSiteId(id); };
   const [online, setOnline] = useState<boolean | null>(null);
   const [sino, setSino] = useState(false);
   const [notifs, setNotifs] = useState<{ itens: Array<{ id: number; tipo: string; titulo: string; mensagem: string; created_at: string; lida: boolean }>; naoLidas: number } | null>(null);
@@ -294,7 +303,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           </div>
         </div>
 
-        <div className={styles.scrollArea}>
+        {(activeTab === 'architecture' || activeTab === 'settings') && sites.length > 0 && (
+          <div data-testid="barra-site" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 24px', borderBottom: '1px solid var(--adm-border)', fontSize: '.8rem', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--adm-text-muted)' }}>Site em edição</span>
+            <select data-testid="seletor-site" className={styles.formInput} style={{ width: 'auto', minWidth: 220 }} value={siteId} onChange={e => trocarSite(e.target.value)}>
+              {sites.map(x => <option key={x.id} value={x.id}>{x.nome}{x.principal ? ' (loja principal)' : ''}{x.status !== 'ativo' ? ` — ${x.status === 'em_construcao' ? 'em construção' : 'arquivado'}` : ''}</option>)}
+            </select>
+            {siteId !== 'luce-d-oro' && <span style={{ color: 'var(--adm-yellow)' }}>Conteúdo, imagens e SEO deste site são separados. Produtos, pedidos, clientes e banners são da loja principal.</span>}
+          </div>
+        )}
+        <div className={styles.scrollArea} key={siteId}>
           {activeTab === 'dashboard'  && <DashboardTab />}
           {activeTab === 'products'   && <ProductsTab />}
           {activeTab === 'categories' && <CategoriesTab />}
@@ -308,7 +326,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'settings'   && <SettingsSection sub={settingsSub} />}
           {activeTab === 'architecture' && (archSection
             ? <><button className={styles.archBack} onClick={() => setArchSection(null)}>← Voltar para Arquitetura Adm.</button><ArchitectureSection secao={archSection} /></>
-            : <ArchitectureHome online={online} onOpenSection={setArchSection} onNavigate={abrirAba} pode={pode} />)}
+            : <ArchitectureHome online={online} onOpenSection={setArchSection} onNavigate={abrirAba} pode={pode} sites={sites} siteId={siteId} onSelectSite={trocarSite} onSitesChanged={carregarSites} />)}
           {activeTab === 'audit'      && <AuditTab />}
         </div>
       </main>

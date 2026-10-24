@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { db, logAudit } from './db.js';
 import type { Area } from './adminTeam.js';
 import { UPLOAD_DIR } from './adminExtras.js';
+import { siteAdmin, siteVisitante } from './sites.js';
 
 type U = { id: number; email: string };
 const quem = (req: Request): U => (req as unknown as { user: U }).user;
@@ -21,8 +22,8 @@ const SEO_PADRAO: Record<SeoChave, string> = {
   seo_category_title: "{categoria} | Luce D'Oro",
 };
 
-function lerSeo(): Record<SeoChave, string> {
-  const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'seo_%'").all() as Array<{ key: string; value: string }>;
+function lerSeo(siteId: string): Record<SeoChave, string> {
+  const rows = db.prepare("SELECT key, value FROM site_settings WHERE site_id = ? AND key LIKE 'seo_%'").all(siteId) as Array<{ key: string; value: string }>;
   const out = { ...SEO_PADRAO };
   for (const r of rows) if ((SEO_CHAVES as readonly string[]).includes(r.key)) out[r.key as SeoChave] = r.value;
   return out;
@@ -54,37 +55,38 @@ function validarSeo(b: Record<string, unknown>): { valores: Partial<Record<SeoCh
 export function registerAdminSettingsExtras(app: Express, painel: (a: Area) => RequestHandler) {
   // ---------- SEO ----------
   // Público: o site lê isto para ajustar título, descrição e compartilhamento.
-  app.get('/api/seo', (_req: Request, res: Response) => {
-    const s = lerSeo();
+  app.get('/api/seo', (req: Request, res: Response) => {
+    const s = lerSeo(siteVisitante(req));
     const v = (k: SeoChave) => s[k] || SEO_PADRAO[k];
     res.json({ title: v('seo_title'), description: v('seo_description'), ogImage: s.seo_og_image, siteUrl: s.seo_site_url, noindex: s.seo_noindex === '1', categoryTitle: v('seo_category_title') });
   });
 
-  app.get('/robots.txt', (_req: Request, res: Response) => {
-    const s = lerSeo();
+  app.get('/robots.txt', (req: Request, res: Response) => {
+    const s = lerSeo(siteVisitante(req));
     const linhas = ['User-agent: *', s.seo_noindex === '1' ? 'Disallow: /' : 'Disallow: /api/'];
     if (s.seo_noindex !== '1' && s.seo_site_url) linhas.push(`Sitemap: ${s.seo_site_url.replace(/\/$/, '')}/sitemap.xml`);
     res.type('text/plain').send(linhas.join('\n') + '\n');
   });
 
   // A loja é de página única (sem endereços próprios por página): o mapa lista só a página inicial.
-  app.get('/sitemap.xml', (_req: Request, res: Response) => {
-    const s = lerSeo();
+  app.get('/sitemap.xml', (req: Request, res: Response) => {
+    const s = lerSeo(siteVisitante(req));
     if (!s.seo_site_url || s.seo_noindex === '1') { res.status(404).type('text/plain').send('Sitemap indisponível: defina o endereço do site em Configurações → SEO.'); return; }
     const loc = s.seo_site_url.replace(/\/$/, '') + '/';
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${loc}</loc></url>\n</urlset>\n`);
   });
 
-  app.get('/api/admin/seo', painel('configuracoes'), (_req: Request, res: Response) => { res.json({ valores: lerSeo(), padrao: SEO_PADRAO }); });
+  app.get('/api/admin/seo', painel('configuracoes'), (req: Request, res: Response) => { res.json({ valores: lerSeo(siteAdmin(req)), padrao: SEO_PADRAO }); });
 
   app.put('/api/admin/seo', painel('configuracoes'), (req: Request, res: Response) => {
     const r = validarSeo((req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>);
     if ('erro' in r) { res.status(400).json({ error: r.erro }); return; }
-    const up = db.prepare("INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP");
-    for (const [k, v] of Object.entries(r.valores)) up.run(k, v as string);
+    const site = siteAdmin(req);
+    const up = db.prepare("INSERT INTO site_settings (site_id, key, value, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(site_id, key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP");
+    for (const [k, v] of Object.entries(r.valores)) up.run(site, k, v as string);
     const u = quem(req);
-    logAudit({ userId: u.id, userEmail: u.email, action: 'SEO_UPDATED', entity: 'SETTINGS', details: { campos: Object.keys(r.valores) } });
-    res.json({ success: true, valores: lerSeo() });
+    logAudit({ userId: u.id, userEmail: u.email, action: 'SEO_UPDATED', entity: 'SETTINGS', details: { site, campos: Object.keys(r.valores) } });
+    res.json({ success: true, valores: lerSeo(site) });
   });
 
   // ---------- Notificações ----------

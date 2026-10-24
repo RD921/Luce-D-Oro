@@ -8,8 +8,8 @@ import path from 'node:path';
 import { db, logAudit } from './db.js';
 import type { Area } from './adminTeam.js';
 import { UPLOAD_DIR } from './adminExtras.js';
+import { SITE_PRINCIPAL, siteAdmin } from './sites.js';
 
-const SITE_ID = 'luce-d-oro';
 const MAX_BYTES = 8 * 1024 * 1024;
 export const CATEGORIAS_MIDIA = [
   { id: 'banners', nome: 'Banners' },
@@ -119,7 +119,7 @@ export function sincronizarPasta(): number {
       if (!tipo) continue;
       const dim = dimensoes(buf, tipo);
       const quando = st.mtime.toISOString().replace('T', ' ').slice(0, 19);
-      ins.run(crypto.randomUUID(), SITE_ID, nome, nome, MIME[tipo], buf.length, dim?.width ?? null, dim?.height ?? null, quando, quando);
+      ins.run(crypto.randomUUID(), SITE_PRINCIPAL, nome, nome, MIME[tipo], buf.length, dim?.width ?? null, dim?.height ?? null, quando, quando);
       novos++;
     } catch { /* ignora arquivo ilegível */ }
   }
@@ -127,21 +127,25 @@ export function sincronizarPasta(): number {
 }
 
 // ---------- Onde cada arquivo é usado ----------
-function colecoesDeTexto(): Array<{ onde: string; texto: string }> {
+function colecoesDeTexto(siteId: string): Array<{ onde: string; texto: string }> {
   const itens: Array<{ onde: string; texto: string }> = [];
   const add = (onde: string, ...partes: Array<unknown>) => itens.push({ onde, texto: partes.map((p) => String(p ?? '')).join(' ') });
-  const seguro = <T>(sql: string): T[] => { try { return db.prepare(sql).all() as T[]; } catch { return []; } };
-  for (const b of seguro<Record<string, unknown>>('SELECT * FROM banners')) add(`Banner "${b.title ?? b.id}"`, b.image_desktop, b.image_mobile);
-  for (const c of seguro<Record<string, unknown>>('SELECT id, name, image_url FROM categories')) add(`Categoria ${c.name}`, c.image_url);
-  for (const p of seguro<Record<string, unknown>>('SELECT id, name, image_primary, images_json FROM products')) add(`Produto ${p.name}`, p.image_primary, p.images_json);
-  for (const c of seguro<Record<string, unknown>>('SELECT key, value FROM site_content')) add(`Conteúdo do site (${c.key})`, c.value);
-  for (const s of seguro<Record<string, unknown>>('SELECT key, value FROM system_settings')) add(`Configuração ${s.key}`, s.value);
+  const seguro = <T>(sql: string, ...args: string[]): T[] => { try { return db.prepare(sql).all(...args) as T[]; } catch { return []; } };
+  // Conteúdo e SEO são de cada site; banners, categorias, produtos e configurações da loja são da loja principal.
+  for (const c of seguro<Record<string, unknown>>('SELECT key, value FROM site_content WHERE site_id = ?', siteId)) add(`Conteúdo do site (${c.key})`, c.value);
+  for (const c of seguro<Record<string, unknown>>('SELECT key, value FROM site_settings WHERE site_id = ?', siteId)) add(`SEO (${c.key})`, c.value);
+  if (siteId === SITE_PRINCIPAL) {
+    for (const b of seguro<Record<string, unknown>>('SELECT * FROM banners')) add(`Banner "${b.title ?? b.id}"`, b.image_desktop, b.image_mobile);
+    for (const c of seguro<Record<string, unknown>>('SELECT id, name, image_url FROM categories')) add(`Categoria ${c.name}`, c.image_url);
+    for (const p of seguro<Record<string, unknown>>('SELECT id, name, image_primary, images_json FROM products')) add(`Produto ${p.name}`, p.image_primary, p.images_json);
+    for (const s of seguro<Record<string, unknown>>("SELECT key, value FROM system_settings WHERE key NOT LIKE 'seo_%'")) add(`Configuração ${s.key}`, s.value);
+  }
   return itens;
 }
 
-function usosDe(nomes: string[]): Map<string, string[]> {
+function usosDe(siteId: string, nomes: string[]): Map<string, string[]> {
   const mapa = new Map<string, string[]>();
-  const corpus = colecoesDeTexto();
+  const corpus = colecoesDeTexto(siteId);
   for (const nome of nomes) {
     const alvo = `/uploads/${nome}`;
     mapa.set(nome, corpus.filter((c) => c.texto.includes(alvo)).map((c) => c.onde));
@@ -174,6 +178,7 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
   app.get('/api/admin/media/categories', porta, (_req: Request, res: Response) => { res.json(CATEGORIAS_MIDIA); });
 
   app.get('/api/admin/media', porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     sincronizarPasta();
     const q = String(req.query.q || '').trim().toLowerCase();
     const cat = String(req.query.category || '');
@@ -191,7 +196,7 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
     if (de) linhas = linhas.filter((r) => r.created_at.slice(0, 10) >= de);
     if (ate) linhas = linhas.filter((r) => r.created_at.slice(0, 10) <= ate);
 
-    const usos = usosDe(linhas.map((r) => r.file_name));
+    const usos = usosDe(SITE_ID, linhas.map((r) => r.file_name));
     if (ordem === 'name') linhas.sort((a, b) => a.original_name.localeCompare(b.original_name, 'pt-BR'));
     else if (ordem === 'size') linhas.sort((a, b) => b.bytes - a.bytes);
     else if (ordem === 'usage') linhas.sort((a, b) => (usos.get(b.file_name)?.length ?? 0) - (usos.get(a.file_name)?.length ?? 0));
@@ -205,6 +210,7 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
   // Copia para a biblioteca as imagens que já vêm com o site, para poderem ser vistas, escolhidas e substituídas.
   // Os originais continuam onde estão; nada é apagado nem alterado.
   app.post('/api/admin/media/import-site-images', porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const u = quem(req);
     const origem = pastaImagensDoSite();
     if (!origem) { res.status(404).json({ error: 'Pasta de imagens do site não encontrada neste servidor.' }); return; }
@@ -234,13 +240,15 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
   });
 
   app.get('/api/admin/media/:id', porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const r = db.prepare('SELECT * FROM media_files WHERE id = ? AND site_id = ?').get(String(req.params.id), SITE_ID) as unknown as MidiaRow | undefined;
     if (!r) { res.status(404).json({ error: 'Arquivo não encontrado.' }); return; }
-    res.json(publico(r, usosDe([r.file_name]).get(r.file_name) || []));
+    res.json(publico(r, usosDe(SITE_ID, [r.file_name]).get(r.file_name) || []));
   });
 
   // Envio de uma imagem por requisição. Corpo: { data, name?, alt?, category? }
   app.post('/api/admin/media', json, porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const u = quem(req);
     const rejeitar = (status: number, motivo: string) => {
       logAudit({ userId: u.id, userEmail: u.email, action: 'MEDIA_UPLOAD_REJECTED', entity: 'MEDIA', details: { motivo } });
@@ -282,6 +290,7 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
   });
 
   app.put('/api/admin/media/:id', json, porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const u = quem(req);
     const r = db.prepare('SELECT * FROM media_files WHERE id = ? AND site_id = ?').get(String(req.params.id), SITE_ID) as unknown as MidiaRow | undefined;
     if (!r) { res.status(404).json({ error: 'Arquivo não encontrado.' }); return; }
@@ -296,11 +305,12 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
     db.prepare("UPDATE media_files SET original_name = ?, alt_text = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(nome, alt, categoria, r.id);
     logAudit({ userId: u.id, userEmail: u.email, action: 'MEDIA_UPDATED', entity: 'MEDIA', entityId: r.id, details: { categoria } });
     const nova = db.prepare('SELECT * FROM media_files WHERE id = ?').get(r.id) as unknown as MidiaRow;
-    res.json(publico(nova, usosDe([nova.file_name]).get(nova.file_name) || []));
+    res.json(publico(nova, usosDe(SITE_ID, [nova.file_name]).get(nova.file_name) || []));
   });
 
   // Substitui o conteúdo mantendo o mesmo endereço (quem usa a imagem passa a mostrar a nova). Exige o mesmo formato.
   app.post('/api/admin/media/:id/replace', json, porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const u = quem(req);
     const r = db.prepare('SELECT * FROM media_files WHERE id = ? AND site_id = ?').get(String(req.params.id), SITE_ID) as unknown as MidiaRow | undefined;
     if (!r) { res.status(404).json({ error: 'Arquivo não encontrado.' }); return; }
@@ -322,15 +332,16 @@ export function registerAdminMedia(app: Express, painel: (a: Area) => RequestHan
     db.prepare("UPDATE media_files SET bytes = ?, width = ?, height = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(buf.length, dim.width, dim.height, r.id);
     logAudit({ userId: u.id, userEmail: u.email, action: 'MEDIA_REPLACED', entity: 'MEDIA', entityId: r.id, details: { bytes: buf.length } });
     const nova = db.prepare('SELECT * FROM media_files WHERE id = ?').get(r.id) as unknown as MidiaRow;
-    res.json(publico(nova, usosDe([nova.file_name]).get(nova.file_name) || []));
+    res.json(publico(nova, usosDe(SITE_ID, [nova.file_name]).get(nova.file_name) || []));
   });
 
   // Exclusão segura: bloqueia se a imagem estiver em uso.
   app.delete('/api/admin/media/:id', porta, (req: Request, res: Response) => {
+    const SITE_ID = siteAdmin(req);
     const u = quem(req);
     const r = db.prepare('SELECT * FROM media_files WHERE id = ? AND site_id = ?').get(String(req.params.id), SITE_ID) as unknown as MidiaRow | undefined;
     if (!r) { res.status(404).json({ error: 'Arquivo não encontrado.' }); return; }
-    const usos = usosDe([r.file_name]).get(r.file_name) || [];
+    const usos = usosDe(SITE_ID, [r.file_name]).get(r.file_name) || [];
     if (usos.length) {
       res.status(409).json({ error: 'Esta imagem está em uso e não pode ser excluída. Substitua-a ou troque a imagem nos locais abaixo.', locais: usos });
       return;

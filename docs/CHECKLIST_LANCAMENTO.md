@@ -36,3 +36,8 @@ Estado conferido por testes automáticos (`test_*.mjs`) e por revisão. Itens ma
 ## Como rodar os testes
 Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 `test_seguranca`, `test_fase7`, `test_versoes`, `test_midia`, `test_arquitetura`, `test_fase3`, `test_fase3b`, `test_fase4`, `test_admin_extras`.
+
+## Vários sites (Fase 2)
+- Cada site tem conteúdo, imagens, SEO, rascunhos e versões próprios; o site público é escolhido pelo domínio (Host).
+- Produtos, pedidos, clientes e banners continuam compartilhados com a loja principal.
+- Para um cliente novo: Arquitetura → Sites e clientes → Adicionar site, e aponte o domínio dele para este servidor.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Upload, Image as ImageIcon, Monitor, Smartphone, RotateCcw, ExternalLink } from 'lucide-react';
 import { api } from '../../services/api';
+import { siteAtual } from '../../services/siteAtual';
 import { MediaPicker } from './MediaLibrary';
 import styles from './AdminPanel.module.css';
 
@@ -127,7 +128,7 @@ export function VisualEditor() {
           <a className={`${styles.btnSmall} ${styles.btnSmallGhost}`} href="/" target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Abrir site</a>
         </div>
         <div style={{ background: '#05090c', border: '1px solid var(--adm-border)', borderRadius: 10, padding: celular ? 12 : 0, display: 'flex', justifyContent: 'center' }}>
-          <iframe ref={frame} title="Prévia do site" data-testid="editor-frame" src="/?editor=1"
+          <iframe ref={frame} title="Prévia do site" data-testid="editor-frame" src={`/?editor=1&site=${encodeURIComponent(siteAtual())}`}
             style={{ border: 0, width: celular ? 390 : '100%', height: '72vh', background: '#fff', borderRadius: celular ? 8 : 10 }} />
         </div>
         <p style={{ fontSize: '.75rem', color: 'var(--adm-text-muted)', marginTop: 8 }}>

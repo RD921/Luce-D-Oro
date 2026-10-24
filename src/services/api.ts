@@ -1,3 +1,4 @@
+import { siteAtual, SITE_PRINCIPAL } from './siteAtual';
 // Luce D'Oro - API Client Service
 
 export interface User {
@@ -200,6 +201,7 @@ export const tokenStorage = {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
+  if (endpoint.startsWith('/api/admin')) { const site = siteAtual(); if (site !== SITE_PRINCIPAL) headers.set('X-Site-Id', site); }
 
   const token = tokenStorage.get();
   if (token) {
@@ -219,6 +221,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return data as T;
+}
+
+export interface AdminSite {
+  id: string; nome: string; cliente: string; dominio: string | null; tipo: string; status: 'ativo' | 'em_construcao' | 'arquivado'; created_at: string;
+  principal?: boolean; midias?: number; rascunhos?: number; publicacoes?: number; ultimaPublicacao?: string | null;
 }
 
 export interface MediaItem {
@@ -495,6 +502,9 @@ export const api = {
     getContent: () =>
       request<Array<{ key: string; label: string; group: string; type: 'text' | 'textarea' | 'image' | 'position'; def: string; value: string; customized: boolean }>>('/api/admin/content'),
 
+    getSites: () => request<AdminSite[]>('/api/admin/sites'),
+    createSite: (b: { nome: string; cliente?: string; dominio?: string; tipo?: string }) => request<AdminSite>('/api/admin/sites', { method: 'POST', body: JSON.stringify(b) }),
+    updateSite: (id: string, b: Partial<{ nome: string; cliente: string; dominio: string; tipo: string; status: string }>) => request<AdminSite>(`/api/admin/sites/${id}`, { method: 'PUT', body: JSON.stringify(b) }),
     getSeo: () => request<{ valores: Record<string, string>; padrao: Record<string, string> }>('/api/admin/seo'),
     saveSeo: (v: Record<string, string>) => request<{ success: boolean; valores: Record<string, string> }>('/api/admin/seo', { method: 'PUT', body: JSON.stringify(v) }),
     getNotifications: (tipo = '', limit = 50) =>

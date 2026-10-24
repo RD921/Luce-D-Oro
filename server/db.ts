@@ -64,6 +64,8 @@ const NOTIFICAR: Record<string, { tipo: 'info' | 'aviso' | 'seguranca'; titulo: 
   MEDIA_STORAGE_ERROR: { tipo: 'aviso', titulo: 'Falha ao gravar imagem no armazenamento' },
   SETTINGS_UPDATED: { tipo: 'info', titulo: 'Configurações da loja alteradas' },
   SEO_UPDATED: { tipo: 'info', titulo: 'Configurações de SEO alteradas' },
+  SITE_CREATED: { tipo: 'info', titulo: 'Novo site cadastrado' },
+  SITE_UPDATED: { tipo: 'info', titulo: 'Dados de um site alterados' },
   PAYMENT_METHOD_CREATED: { tipo: 'info', titulo: 'Forma de pagamento criada' },
   PAYMENT_METHOD_UPDATED: { tipo: 'info', titulo: 'Forma de pagamento alterada' },
   PAYMENT_METHOD_DELETED: { tipo: 'aviso', titulo: 'Forma de pagamento removida' },

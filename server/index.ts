@@ -13,6 +13,7 @@ import {
 } from './db.js';
 import { registerAdminExtras } from './adminExtras.js';
 import { registerAdminMedia } from './adminMedia.js';
+import { migrarSites, resolverSiteAdmin, registerSites } from './sites.js';
 import { registerAdminSettingsExtras } from './adminSettingsExtras.js';
 import { registerSiteContent } from './siteContent.js';
 import { registerAdminCatalog } from './adminCatalog.js';
@@ -22,6 +23,7 @@ import { cabecalhosSeguranca, origemPermitida, limitarFalhas } from './seguranca
 import { registerAdminTeam, criarPainel, areasDoPapel, motivoCupomInvalido, registrarUsoCupom } from './adminTeam.js';
 
 initDatabase();
+migrarSites();
 
 const app = express();
 app.disable('x-powered-by');
@@ -43,6 +45,7 @@ const limiteChaveDono = limitarFalhas({ janelaMs: 15 * 60_000, max: 5, chave: (r
 // O upload de imagens tem leitor próprio (aceita arquivos maiores), por isso é pulado aqui
 app.use((req, res, next) => (req.path === '/api/admin/uploads' || req.path.startsWith('/api/admin/media') ? next() : express.json()(req, res, next)));
 app.use(cookieParser());
+app.use('/api/admin', resolverSiteAdmin);
 
 // Helper to authenticate request via Cookie or Authorization header
 export interface AuthenticatedRequest extends Request {
@@ -873,6 +876,7 @@ app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Respons
 const painel = criarPainel(authMiddleware as any);
 registerAdminExtras(app, painel);
 registerAdminMedia(app, painel);
+registerSites(app, painel);
 registerAdminSettingsExtras(app, painel);
 registerSiteContent(app, painel);
 registerAdminTeam(app, painel, ownerAuthMiddleware as any);
