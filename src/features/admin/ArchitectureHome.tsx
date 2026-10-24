@@ -167,8 +167,8 @@ export function ArchitectureHome({ online, onOpenSection, pode, sites: listaSite
         <div className={styles.archPanel} style={{ marginBottom: 0 }}>
           <div className={styles.archPanelHead}><span className={styles.archPanelTitle}>Resumo do site atual</span></div>
           <div className={styles.archList}>
-            <div className={styles.archRow}><span>Site</span><span className={styles.archRowMain}>{nomeSite}</span></div>
-            <div className={styles.archRow}><span>Endereço</span><span className={styles.archRowMain}>{d?.site.dominio || host}</span></div>
+            <div className={styles.archRow}><span>Site</span><span className={styles.archRowMain}>{sitAtual?.nome || nomeSite}</span></div>
+            <div className={styles.archRow}><span>Endereço</span><span className={styles.archRowMain}>{sitAtual ? (sitAtual.dominio || (sitAtual.principal ? host : '—')) : d?.site.dominio || host}</span></div>
             <div className={styles.archRow}><span>Ambiente</span><span className={styles.archRowMain}>{d?.site.ambiente || '—'}</span></div>
             <div className={styles.archRow}><span>Última atividade</span><span className={styles.archRowMain}>{fmt(d?.ultimaAtividade ?? null)}</span></div>
             <div style={{ display: 'flex', gap: 8, paddingTop: 12, flexWrap: 'wrap' }}>
