@@ -1,0 +1,385 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-overlay);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.25s ease;
+}
+
+.popoverCard {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  padding: 2.4rem 2.2rem;
+  position: relative;
+  animation: modalScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  color: var(--text-muted);
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+}
+
+.contextBanner {
+  background-color: var(--gold-tint);
+  border: 1px solid var(--border-gold);
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--gold-dark);
+  line-height: 1.4;
+  border-radius: 1px;
+}
+
+.contextIcon {
+  flex-shrink: 0;
+}
+
+.headerArea {
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+  line-height: 1.45;
+}
+
+.errorAlert {
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #B91C1C;
+  font-size: 0.8rem;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.2rem;
+  border-radius: 1px;
+  animation: slideDownSmooth 0.2s ease;
+}
+
+.inputGroup {
+  margin-bottom: 1.2rem;
+}
+
+.inputLabel {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  margin-bottom: 0.45rem;
+}
+
+.emailRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.textInput {
+  width: 100%;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 0.925rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1px;
+  transition: all var(--transition-fast);
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+
+.arrowButton {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-radius: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.arrowButton:hover:not(:disabled) {
+  background-color: var(--btn-primary-hover);
+  transform: translateY(-50%) translateX(2px);
+}
+
+.arrowButton:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Progressive Vertical Expansion Area */
+.passwordExpansionArea {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.25s ease,
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.passwordExpansionArea.expanded {
+  max-height: 360px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.passwordInnerContent {
+  padding-top: 0.4rem;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.inlineLink {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition-fast);
+}
+
+.inlineLink:hover {
+  color: var(--gold-dark);
+}
+
+.passwordFieldWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.eyeToggleBtn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eyeToggleBtn:hover {
+  color: var(--text-primary);
+}
+
+.submitBtn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.95rem;
+}
+
+.demoHelper {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.demoFillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--gold-dark);
+  background-color: var(--gold-tint);
+  border: 1px dashed var(--border-gold);
+  padding: 0.4rem 0.8rem;
+  border-radius: 1px;
+  transition: all var(--transition-fast);
+}
+
+.demoFillBtn:hover {
+  background-color: rgba(184, 151, 88, 0.16);
+  border-color: var(--gold-primary);
+}
+
+.bottomArea {
+  margin-top: 1.8rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.footerPrompt {
+  color: var(--text-secondary);
+}
+
+.footerLink {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition-fast);
+}
+
+.footerLink:hover {
+  color: var(--gold-dark);
+}
+
+/* Back navigation */
+.backRow {
+  margin-bottom: 1.2rem;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.backButton:hover {
+  color: var(--text-primary);
+}
+
+/* Checkbox */
+.checkboxGroup {
+  margin: 1rem 0 1.2rem 0;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.checkboxInput {
+  margin-top: 2px;
+  accent-color: var(--text-primary);
+}
+
+/* Success Box */
+.successBox {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.checkCircle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--gold-tint);
+  color: var(--gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+  border: 1px solid var(--border-gold);
+}
+
+.successTitle {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.successText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Mobile Adaptations */
+@media (max-width: 640px) {
+  .overlay {
+    padding: 1rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .popoverCard {
+    max-width: 100%;
+    border-radius: 4px;
+    padding: 2rem 1.4rem;
+  }
+}

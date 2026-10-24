@@ -13,7 +13,7 @@
 .headerScrolled {
   background-color: rgba(250, 248, 245, 0.94);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);backdrop-filter:blur(12px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   border-bottom-color: rgba(235, 229, 220, 0.8);
 }
