@@ -48,3 +48,7 @@ Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 - Ajustes: `BACKUP_HORAS` (intervalo), `BACKUP_GUARDAR` (quantos manter), `BACKUP_DESLIGADO=1`.
 - Os backups ficam no mesmo disco do banco. Em produção, copie-os também para fora do servidor.
 - O pedido é gravado em transação: se algo falhar no meio, nada fica salvo e o estoque não muda.
+
+## Regras de negócio (camada de serviços)
+- `server/servicos/` guarda regras sem Express. Já migrado: checkout (`criarPedido`). As rotas só leem a requisição e devolvem a resposta.
+- Teste direto, sem subir a API: `DATA_DIR=<cópia do banco limpo> npx tsx test_servicos.ts`.
