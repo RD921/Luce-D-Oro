@@ -50,5 +50,5 @@ Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 - O pedido é gravado em transação: se algo falhar no meio, nada fica salvo e o estoque não muda.
 
 ## Regras de negócio (camada de serviços)
-- `server/servicos/` guarda regras sem Express. Já migrado: checkout (`criarPedido`). As rotas só leem a requisição e devolvem a resposta.
+- `server/servicos/` guarda regras sem Express. Já migrados: checkout (`criarPedido`) e sacola (`servicos/carrinho.ts`). As rotas só leem a requisição e devolvem a resposta.
 - Teste direto, sem subir a API: `DATA_DIR=<cópia do banco limpo> npx tsx test_servicos.ts`.
