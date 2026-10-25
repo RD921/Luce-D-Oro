@@ -41,3 +41,10 @@ Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 - Cada site tem conteúdo, imagens, SEO, rascunhos e versões próprios; o site público é escolhido pelo domínio (Host).
 - Produtos, pedidos, clientes e banners continuam compartilhados com a loja principal.
 - Para um cliente novo: Arquitetura → Sites e clientes → Adicionar site, e aponte o domínio dele para este servidor.
+
+## Banco e backups
+- O banco usa modo WAL: junto de `luce_d_oro.db` aparecem `-wal` e `-shm`. É normal; copie sempre o conjunto, ou use os backups prontos.
+- Backup automático: na subida e a cada 24 h, em `DATA_DIR/backup-auto-AAAAMMDD-HHMMSS.db` (consistente, gerado por VACUUM INTO). Guarda os 14 mais recentes.
+- Ajustes: `BACKUP_HORAS` (intervalo), `BACKUP_GUARDAR` (quantos manter), `BACKUP_DESLIGADO=1`.
+- Os backups ficam no mesmo disco do banco. Em produção, copie-os também para fora do servidor.
+- O pedido é gravado em transação: se algo falhar no meio, nada fica salvo e o estoque não muda.

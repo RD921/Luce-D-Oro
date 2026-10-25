@@ -13,6 +13,7 @@ import { registerAdminArchitecture } from './adminArchitecture.js';
 import { cabecalhosSeguranca, origemPermitida } from './seguranca.js';
 import { registerAdminTeam, criarPainel } from './adminTeam.js';
 import { authMiddleware, ownerAuthMiddleware } from './auth.js';
+import { iniciarBackups } from './backup.js';
 import { registerRotasAuth } from './rotas/auth.js';
 import { registerRotasProprietario } from './rotas/proprietario.js';
 import { registerCatalogoPublico } from './rotas/catalogoPublico.js';
@@ -75,6 +76,7 @@ registerSistema(app, painel);
 registerAdminClientes(app, painel);
 
 app.listen(PORT, () => {
+  iniciarBackups();
   console.log(`[Luce D'Oro API] Server running on http://localhost:${PORT}`);
   console.log(`[Luce D'Oro Security] Owner Authorized: ${AUTHORIZED_OWNER.name} <${AUTHORIZED_OWNER.email}>`);
   // A chave só é exibida enquanto ainda não foi usada (cadastro do dono pendente).

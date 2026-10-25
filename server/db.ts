@@ -11,6 +11,27 @@ if (!fs.existsSync(DB_DIR)) {
 
 const DB_PATH = path.join(DB_DIR, 'luce_d_oro.db');
 export const db = new DatabaseSync(DB_PATH);
+export const DATA_DIR_EM_USO = DB_DIR;
+
+// Modo WAL: leituras não travam gravações e uma queda de energia não corrompe o banco.
+// busy_timeout: se o banco estiver ocupado, espera até 5 s em vez de falhar na hora.
+// Cópias de segurança usam VACUUM INTO (server/backup.ts), que já inclui o conteúdo do WAL.
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA busy_timeout = 5000');
+db.exec('PRAGMA synchronous = NORMAL');
+
+// Agrupa gravações que precisam acontecer juntas (tudo ou nada). Se algo falhar no meio, nada fica salvo.
+export function emTransacao<T>(fn: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const r = fn();
+    db.exec('COMMIT');
+    return r;
+  } catch (e) {
+    try { db.exec('ROLLBACK'); } catch { /* já desfeita */ }
+    throw e;
+  }
+}
 
 // Critical Rule: Authorized Owner Definition
 export const AUTHORIZED_OWNER = {
@@ -544,5 +565,29 @@ function seedData() {
     `);
     insertCoupon.run('cp_bemvindo10', 'BEMVINDO10', 'percent', 10, 300, 1, 0);
     insertCoupon.run('cp_ouro150', 'OURO150', 'fixed', 150, 1000, 1, 0);
+  }
+
+  criarIndices();
+}
+
+// Índices das consultas mais frequentes (listar pedidos do cliente, itens do pedido, sacola, catálogo, sessões, auditoria).
+const INDICES: Array<[string, string, string]> = [
+  ['idx_orders_user', 'orders', 'user_id, created_at'],
+  ['idx_orders_created', 'orders', 'created_at'],
+  ['idx_order_items_order', 'order_items', 'order_id'],
+  ['idx_cart_items_cart', 'cart_items', 'cart_id'],
+  ['idx_carts_user', 'carts', 'user_id'],
+  ['idx_products_categoria', 'products', 'category_id, is_archived'],
+  ['idx_variants_product', 'product_variants', 'product_id'],
+  ['idx_sessions_user', 'sessions', 'user_id'],
+  ['idx_sessions_expira', 'sessions', 'expires_at'],
+  ['idx_stock_mov_product', 'stock_movements', 'product_id, created_at'],
+  ['idx_audit_created', 'admin_audit_logs', 'created_at'],
+  ['idx_banners_ativos', 'banners', 'is_active, display_order'],
+];
+export function criarIndices() {
+  for (const [nome, tabela, colunas] of INDICES) {
+    const existe = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela);
+    if (existe) db.exec(`CREATE INDEX IF NOT EXISTS ${nome} ON ${tabela}(${colunas})`);
   }
 }

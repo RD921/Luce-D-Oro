@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import type { Express } from 'express';
-import { db } from '../db.js';
+import { db, emTransacao } from '../db.js';
 import { ESTOQUE_SQL, temVariantes, baixarEstoque, resolverEntrega, resolverPagamento } from '../adminCommerce.js';
 import { motivoCupomInvalido, registrarUsoCupom } from '../adminTeam.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth.js';
@@ -99,40 +99,49 @@ export function registerPedidos(app: Express) {
     const total = Math.max(0, subtotal - discount - descontoPagamento) + entrega.custo;
     const orderId = `PED-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 900 + 100)}`;
 
-    db.prepare(
-      'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method, shipping_method, shipping_cost, coupon_discount, payment_discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(orderId, userId, total, 'Confirmado', shippingAddress, pag.descricao || paymentMethod, entrega.metodo?.name ?? null, entrega.custo, discount, descontoPagamento);
-    if (cupomUsado) registrarUsoCupom(cupomUsado, userId, orderId);
+    // Pedido, itens, cupom, estoque e sacola são gravados juntos: se qualquer passo falhar, nada fica pela metade.
+    try {
+      emTransacao(() => {
+        db.prepare(
+          'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method, shipping_method, shipping_cost, coupon_discount, payment_discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(orderId, userId, total, 'Confirmado', shippingAddress, pag.descricao || paymentMethod, entrega.metodo?.name ?? null, entrega.custo, discount, descontoPagamento);
+        if (cupomUsado) registrarUsoCupom(cupomUsado, userId, orderId);
 
-    const insertOrderItem = db.prepare(`
-      INSERT INTO order_items (order_id, product_id, product_name, variant_title, unit_price, quantity, image_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+        const insertOrderItem = db.prepare(`
+          INSERT INTO order_items (order_id, product_id, product_name, variant_title, unit_price, quantity, image_url)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
 
-    for (const item of items) {
-      insertOrderItem.run(
-        orderId,
-        item.product_id,
-        item.name,
-        item.variant_title,
-        item.price,
-        item.quantity,
-        item.image_primary
-      );
+        for (const item of items) {
+          insertOrderItem.run(
+            orderId,
+            item.product_id,
+            item.name,
+            item.variant_title,
+            item.price,
+            item.quantity,
+            item.image_primary
+          );
 
-      // Decrement stock (da variação, quando houver) & record movement
-      const prevStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
-      baixarEstoque(item.product_id, item.variant_title, item.quantity);
-      const newStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
+          // Decrement stock (da variação, quando houver) & record movement
+          const prevStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
+          baixarEstoque(item.product_id, item.variant_title, item.quantity);
+          const newStock = (db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id) as { stock: number }).stock;
 
-      db.prepare(`
-        INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(item.product_id, newStock - prevStock, prevStock, newStock, `Venda aprovada Pedido ${orderId}${temVariantes(item.product_id) ? ` (${item.variant_title})` : ''}`, userId);
+          db.prepare(`
+            INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(item.product_id, newStock - prevStock, prevStock, newStock, `Venda aprovada Pedido ${orderId}${temVariantes(item.product_id) ? ` (${item.variant_title})` : ''}`, userId);
+        }
+
+        // Clear cart
+        db.prepare('DELETE FROM cart_items WHERE cart_id = ?').run(cart.id);
+      });
+    } catch (e) {
+      console.error('[Pedido] falha ao gravar, nada foi salvo:', e);
+      res.status(500).json({ error: 'Não foi possível concluir o pedido. Nada foi cobrado; tente novamente.' });
+      return;
     }
-
-    // Clear cart
-    db.prepare('DELETE FROM cart_items WHERE cart_id = ?').run(cart.id);
 
     res.status(201).json({
       success: true,
