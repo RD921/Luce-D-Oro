@@ -21,6 +21,7 @@ import { registerCarrinho } from './rotas/carrinho.js';
 import { registerPedidos } from './rotas/pedidos.js';
 import { registerAdminDashboard } from './rotas/adminDashboard.js';
 import { registerAdminProdutos } from './rotas/adminProdutos.js';
+import { registerAdminCupons } from './rotas/adminCupons.js';
 import { registerAdminPedidos } from './rotas/adminPedidos.js';
 import { registerAdminEstoque } from './rotas/adminEstoque.js';
 import { registerAdminBanners } from './rotas/adminBanners.js';
@@ -69,6 +70,7 @@ registerAdminArchitecture(app, painel);
 // Rotas do painel
 registerAdminDashboard(app, painel);
 registerAdminProdutos(app, painel);
+registerAdminCupons(app, painel);
 registerAdminPedidos(app, painel);
 registerAdminEstoque(app, painel);
 registerAdminBanners(app, painel);

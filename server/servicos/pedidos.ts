@@ -1,6 +1,6 @@
 import { db, emTransacao } from '../db.js';
 import { ESTOQUE_SQL, temVariantes, baixarEstoque, resolverEntrega, resolverPagamento } from '../adminCommerce.js';
-import { motivoCupomInvalido, registrarUsoCupom } from '../adminTeam.js';
+import { motivoCupomInvalido, registrarUsoCupom, calcularDesconto } from './cupons.js';
 
 // Regras do checkout. Não conhece Express: recebe os dados e devolve o resultado, o que permite testar sem subir a API.
 export interface EntradaPedido {
@@ -66,11 +66,7 @@ export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPe
   if (couponCode) {
     const coupon = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(couponCode).trim().toUpperCase()) as any;
     if (coupon && !motivoCupomInvalido(coupon, userId, subtotal)) {
-      if (coupon.discount_type === 'percent') {
-        discount = (subtotal * coupon.discount_value) / 100;
-      } else {
-        discount = Math.min(coupon.discount_value, subtotal);
-      }
+      discount = calcularDesconto(coupon, subtotal);
       cupomUsado = coupon.id;
     }
   }

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import type { Express } from 'express';
 import { db } from '../db.js';
 import { variantesDe } from '../adminCommerce.js';
-import { motivoCupomInvalido } from '../adminTeam.js';
+import { validarCupomPublico } from '../servicos/cupons.js';
 
 export function registerCatalogoPublico(app: Express) {
   // ==================== PUBLIC STORE ROUTES ====================
@@ -83,42 +83,10 @@ export function registerCatalogoPublico(app: Express) {
 
   // Public Validate Coupon
   app.post('/api/coupons/validate', (req: Request, res: Response) => {
-    const { code, cartTotal } = req.body;
-    if (!code) {
-      res.status(400).json({ error: 'Código de cupom obrigatório.' });
-      return;
-    }
-
-    const coupon = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(code).trim().toUpperCase()) as any;
-    if (!coupon) {
-      res.status(404).json({ error: 'Cupom inválido ou inativo.' });
-      return;
-    }
-    const quemPede = (() => {
-      const t = (req as any).cookies?.session_token || req.headers.authorization?.replace('Bearer ', '');
-      if (!t) return null;
-      const r = db.prepare('SELECT user_id FROM sessions WHERE token = ? AND expires_at > ?').get(t, new Date().toISOString()) as { user_id: number } | undefined;
-      return r ? r.user_id : null;
-    })();
-    const motivo = motivoCupomInvalido(coupon, quemPede, Number(cartTotal) || 0);
-    if (motivo) {
-      res.status(400).json({ error: motivo });
-      return;
-    }
-
-    let discount = 0;
-    if (coupon.discount_type === 'percent') {
-      discount = (cartTotal * coupon.discount_value) / 100;
-    } else {
-      discount = Math.min(coupon.discount_value, cartTotal);
-    }
-
-    res.json({
-      valid: true,
-      code: coupon.code,
-      discountType: coupon.discount_type,
-      discountValue: coupon.discount_value,
-      discountAmount: discount,
-    });
+    const tk = (req as any).cookies?.session_token || req.headers.authorization?.replace('Bearer ', '');
+    const sessao = tk ? (db.prepare('SELECT user_id FROM sessions WHERE token = ? AND expires_at > ?').get(tk, new Date().toISOString()) as { user_id: number } | undefined) : undefined;
+    const r = validarCupomPublico(req.body?.code, req.body?.cartTotal, sessao ? sessao.user_id : null);
+    if (!r.ok) { res.status(r.status).json({ error: r.erro }); return; }
+    res.json({ valid: true, code: r.code, discountType: r.discountType, discountValue: r.discountValue, discountAmount: r.discountAmount });
   });
 }
