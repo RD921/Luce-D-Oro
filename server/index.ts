@@ -14,6 +14,7 @@ import { cabecalhosSeguranca, origemPermitida } from './seguranca.js';
 import { registerAdminTeam, criarPainel } from './adminTeam.js';
 import { authMiddleware, ownerAuthMiddleware } from './auth.js';
 import { iniciarBackups } from './backup.js';
+import { migrarLojas } from './lojas.js';
 import { registerRotasAuth } from './rotas/auth.js';
 import { registerRotasProprietario } from './rotas/proprietario.js';
 import { registerCatalogoPublico } from './rotas/catalogoPublico.js';
@@ -76,6 +77,9 @@ registerAdminEstoque(app, painel);
 registerAdminBanners(app, painel);
 registerSistema(app, painel);
 registerAdminClientes(app, painel);
+
+// Todas as tabelas já existem aqui; acrescenta o dono (site_id) dos dados comerciais.
+migrarLojas();
 
 app.listen(PORT, () => {
   iniciarBackups();

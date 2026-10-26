@@ -52,3 +52,9 @@ Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 ## Regras de negócio (camada de serviços)
 - `server/servicos/` guarda regras sem Express. Migrados: checkout, sacola, produtos, estoque e cupons (`servicos/*.ts`). As rotas só leem a requisição e devolvem a resposta.
 - Teste direto, sem subir a API: `DATA_DIR=<cópia do banco limpo> npx tsx test_servicos.ts`.
+
+## Lojas independentes (Fase 3)
+- Etapa 1 pronta: as tabelas comerciais (categorias, produtos, banners, cupons, frete, pagamento, pedidos, auditoria, notificações e usuários) têm `site_id`. Tudo o que existia ficou na loja principal; o proprietário fica sem loja (vê todas).
+- A migração roda sozinha na subida, só se faltar coluna, e antes cria `data/backup-pre-lojas-AAAAMMDD-HHMMSS.db`. Esse backup nunca é apagado sozinho. Para voltar atrás: pare o servidor e restaure esse arquivo como `luce_d_oro.db`.
+- Ainda NÃO há isolamento: o painel e a vitrine continuam enxergando tudo. As etapas 2 a 5 (painel por loja, vitrine por domínio, contas por loja, loja nova vazia) vêm a seguir.
+- Teste: `DATA_DIR=<cópia de um banco antigo> npx tsx test_lojas.ts`.

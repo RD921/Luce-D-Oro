@@ -40,3 +40,11 @@ export function iniciarBackups() {
   if (!ultimo || Date.now() - ultimo.criadoEm > HORAS * 3600_000) rodar();
   setInterval(rodar, HORAS * 3600_000).unref();
 }
+
+// Cópia feita logo antes de uma migração do banco. O nome começa com "backup-pre-" e nunca é apagado sozinho.
+export function backupAntesDeMigrar(rotulo: string): string {
+  let destino = path.join(DATA_DIR_EM_USO, `backup-pre-${rotulo}-${carimbo()}.db`);
+  if (fs.existsSync(destino)) destino = destino.replace(/\.db$/, `-${Date.now() % 1000}.db`);
+  db.exec(`VACUUM INTO '${destino.replace(/'/g, "''")}'`);
+  return destino;
+}
