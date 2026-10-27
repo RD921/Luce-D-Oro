@@ -12,9 +12,14 @@ const quem = (req: Request): Usuario => (req as unknown as { user: Usuario }).us
 //   'rw' = pode ver e alterar   'r' = só ver
 // O proprietário sempre pode tudo. Configurações, Auditoria e Equipe são SÓ do proprietário.
 // ---------------------------------------------------------------------------
-export type Area = 'dashboard' | 'produtos' | 'categorias' | 'estoque' | 'pedidos' | 'clientes' | 'banners' | 'conteudo' | 'cupons' | 'uploads' | 'entrega' | 'configuracoes' | 'pagamento' | 'auditoria' | 'arquitetura';
+export type Area = 'dashboard' | 'produtos' | 'categorias' | 'estoque' | 'pedidos' | 'clientes' | 'banners' | 'conteudo' | 'cupons' | 'uploads' | 'entrega' | 'configuracoes' | 'pagamento' | 'auditoria' | 'arquitetura' | 'equipe';
 
 export const PAPEIS: Record<string, { label: string; descricao: string; areas: Partial<Record<Area, 'r' | 'rw'>> }> = {
+  admin_loja: {
+    label: 'Administrador da loja',
+    descricao: 'Dono da loja: cuida de tudo nela, inclusive Configurações, Pagamento e a Equipe da própria loja.',
+    areas: { dashboard: 'rw', produtos: 'rw', categorias: 'rw', estoque: 'rw', pedidos: 'rw', clientes: 'rw', banners: 'rw', conteudo: 'rw', cupons: 'rw', uploads: 'rw', entrega: 'rw', configuracoes: 'rw', pagamento: 'rw', equipe: 'rw' },
+  },
   dev: {
     label: 'Desenvolvedor',
     descricao: 'Acesso técnico total: loja, Configurações, Arquitetura, Pagamento e Auditoria. Só não gerencia a Equipe.',
@@ -78,8 +83,14 @@ export function criarPainel(authMiddleware: RequestHandler) {
     };
 }
 
-export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHandler, ownerOnly: RequestHandler) {
+// Quem pode atribuir quais níveis: o proprietário atribui qualquer um; o administrador da loja só os de equipe comum.
+const PAPEIS_RESERVADOS = ['dev', 'admin_loja'];
+const papeisPermitidos = (u: Usuario) => (ehDono(u) ? Object.keys(PAPEIS) : Object.keys(PAPEIS).filter((p) => !PAPEIS_RESERVADOS.includes(p)));
+
+export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHandler, _ownerOnly: RequestHandler) {
   migrarCupons();
+  // Equipe: o proprietário (qualquer loja) e o administrador da própria loja
+  const ownerOnly = painel('equipe');
 
   // ---------- Ficha do cliente ----------
   app.get('/api/admin/customers/:id', painel('clientes'), (req: Request, res: Response) => {
@@ -95,20 +106,22 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
     const membros = db
       .prepare(`SELECT id, name, email, role, created_at FROM users WHERE role IN (${Object.keys(PAPEIS).map(() => '?').join(',')}) AND site_id = ? ORDER BY name`)
       .all(...Object.keys(PAPEIS), siteAdmin(req));
+    const permitidos = papeisPermitidos(quem(req));
     res.json({
       membros,
-      papeis: Object.entries(PAPEIS).map(([id, p]) => ({ id, label: p.label, descricao: p.descricao, areas: p.areas })),
+      papeis: Object.entries(PAPEIS).filter(([id]) => permitidos.includes(id)).map(([id, p]) => ({ id, label: p.label, descricao: p.descricao, areas: p.areas })),
     });
   });
 
   app.post('/api/admin/team', ownerOnly, (req: Request, res: Response) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const papel = String(req.body?.role || '');
-    if (!PAPEIS[papel]) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
+    if (!PAPEIS[papel] || !papeisPermitidos(quem(req)).includes(papel)) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
     if (email === AUTHORIZED_OWNER.email.toLowerCase()) { res.status(400).json({ error: 'A conta do proprietário não pode ser alterada aqui.' }); return; }
     const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE lower(email) = ? AND site_id = ?').get(email, siteAdmin(req)) as Usuario | undefined;
     if (!alvo) { res.status(404).json({ error: 'Essa pessoa ainda não tem conta. Peça para ela se cadastrar nesta loja e tente de novo.' }); return; }
     if (alvo.role === 'owner') { res.status(400).json({ error: 'Esta conta é de proprietário e não pode ser alterada.' }); return; }
+    if (!papeisPermitidos(quem(req)).includes(alvo.role) && alvo.role !== 'customer') { res.status(403).json({ error: 'Só o proprietário altera este nível de acesso.' }); return; }
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run(papel, alvo.id);
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'TEAM_MEMBER_SET', entity: 'USERS', entityId: String(alvo.id), details: { email: alvo.email, de: alvo.role, para: papel } });
@@ -117,9 +130,10 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
 
   app.put('/api/admin/team/:id', ownerOnly, (req: Request, res: Response) => {
     const papel = String(req.body?.role || '');
-    if (!PAPEIS[papel]) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
+    if (!PAPEIS[papel] || !papeisPermitidos(quem(req)).includes(papel)) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
     const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ? AND site_id = ?').get(Number(req.params.id), siteAdmin(req)) as Usuario | undefined;
     if (!alvo || !PAPEIS[alvo.role]) { res.status(404).json({ error: 'Membro da equipe não encontrado.' }); return; }
+    if (!papeisPermitidos(quem(req)).includes(alvo.role)) { res.status(403).json({ error: 'Só o proprietário altera este nível de acesso.' }); return; }
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run(papel, alvo.id);
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'TEAM_MEMBER_CHANGED', entity: 'USERS', entityId: String(alvo.id), details: { email: alvo.email, de: alvo.role, para: papel } });
@@ -129,6 +143,7 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
   app.delete('/api/admin/team/:id', ownerOnly, (req: Request, res: Response) => {
     const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ? AND site_id = ?').get(Number(req.params.id), siteAdmin(req)) as Usuario | undefined;
     if (!alvo || !PAPEIS[alvo.role]) { res.status(404).json({ error: 'Membro da equipe não encontrado.' }); return; }
+    if (!papeisPermitidos(quem(req)).includes(alvo.role)) { res.status(403).json({ error: 'Só o proprietário altera este nível de acesso.' }); return; }
     db.prepare("UPDATE users SET role = 'customer' WHERE id = ?").run(alvo.id);
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'TEAM_MEMBER_REMOVED', entity: 'USERS', entityId: String(alvo.id), details: { email: alvo.email, era: alvo.role } });

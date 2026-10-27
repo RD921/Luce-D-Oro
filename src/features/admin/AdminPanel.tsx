@@ -80,7 +80,7 @@ const TABS: Tab[] = [
   { id: 'payments',   label: 'Pagamento',    icon: <CreditCard size={15} />,      group: 'Sistema', area: 'pagamento' },
   { id: 'settings',   label: 'Configurações',icon: <Settings size={15} />,        group: 'Sistema', area: 'configuracoes' },
   { id: 'architecture', label: 'Arquitetura Adm.', icon: <Layers size={15} />,    group: 'Sistema', area: 'arquitetura', qualquer: ['arquitetura', 'banners', 'conteudo', 'uploads'] },
-  { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', owner: true },
+  { id: 'team',       label: 'Equipe',       icon: <Shield size={15} />,          group: 'Sistema', area: 'equipe' },
   { id: 'audit',      label: 'Auditoria',    icon: <Shield size={15} />,          group: 'Sistema', area: 'auditoria' },
 ];
 
@@ -131,7 +131,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     return () => { vivo = false; window.clearInterval(t); };
   }, []);
   const iniciaisUsuario = (user?.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
-  const papelRotulo = isOwner ? 'Proprietário' : user?.role === 'dev' ? 'Desenvolvedor' : 'Equipe';
+  const papelRotulo = isOwner ? 'Proprietário' : user?.role === 'dev' ? 'Desenvolvedor' : user?.role === 'admin_loja' ? 'Administrador' : 'Equipe';
   const abrirAba = (id: string) => { setActiveTab(id as TabId); setArchSection(null); };
   const grupos = Array.from(new Set(abas.map(t => t.group)));
 
@@ -258,7 +258,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'customers'  && <CustomersTab />}
           {activeTab === 'shipping'   && <ShippingTab />}
           {activeTab === 'payments'   && <PaymentsTab />}
-          {activeTab === 'team'       && isOwner && <TeamTab />}
+          {activeTab === 'team'       && pode('equipe') && <TeamTab />}
           {activeTab === 'settings'   && <SettingsSection sub={settingsSub} />}
           {activeTab === 'architecture' && (archSection
             ? <><button className={styles.archBack} onClick={() => setArchSection(null)}>← Voltar para Arquitetura Adm.</button><ArchitectureSection secao={archSection} /></>

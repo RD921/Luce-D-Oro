@@ -112,7 +112,7 @@ async function principal() {
   r = await api('POST', '/api/admin/team', dono, { email: atdEmail, role: 'atendente' });
   r = await api('POST', '/api/admin/team', dono, { email: estEmail, role: 'estoquista' });
   const eq = await api('GET', '/api/admin/team', dono);
-  ok(eq.json?.membros?.length >= 3 && eq.json?.papeis?.length === 4, 'lista da equipe e dos níveis', eq.json);
+  ok(eq.json?.membros?.length >= 3 && eq.json?.papeis?.length === 5, 'lista da equipe e dos níveis', eq.json);
   r = await api('GET', '/api/admin/team', tk.ger);
   ok(r.status === 403, 'nem o gerente vê a equipe');
 

@@ -1,5 +1,7 @@
 // Fase 3 — isolamento entre lojas: a loja B não lê nem altera nada da loja A (e vice-versa). Servidor limpo em :3001 com dev@x.com / c@x.com.
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 let falhas = 0, total = 0;
 const ok = (c, m, x) => { total++; if (!c) { falhas++; console.log('FALHOU:', m, x ?? ''); } };
 const req = (method, path, { token, site, host, body } = {}) => new Promise((resolve, reject) => {
@@ -119,6 +121,41 @@ ok((await a('PUT', `/api/admin/orders/${pedido}/status`, { status: 'Enviado' }))
 ok((await b('PUT', `/api/admin/orders/${pedido}/status`, { status: 'Enviado' })).s === 200, 'B altera o próprio pedido');
 ok((await b('GET', '/api/admin/dashboard')).s === 200, 'dashboard da B abre');
 ok((await a('GET', '/api/admin/dashboard')).s === 200, 'dashboard da A abre');
+
+// ---- Administrador da loja (comprador) e equipe própria
+const donoEmail = 'rodrigoarrezzi@icloud.com', donoSenha = 'RodrigoOuro#2026';
+r = await req('POST', '/api/auth/register', { body: { name: 'Rodrigo Arrezzi', email: donoEmail, password: donoSenha, confirmPassword: donoSenha } });
+if (r.s >= 400) r = await req('POST', '/api/auth/login', { body: { email: donoEmail, password: donoSenha } });
+let dono = r.d.token;
+const chave = fs.readFileSync(path.join(process.env.DATA_DIR || './data', 'owner_setup_key.txt'), 'utf-8').trim();
+await req('POST', '/api/admin/setup/verify-owner', { token: dono, body: { setupKey: chave } });
+dono = (await req('POST', '/api/auth/login', { body: { email: donoEmail, password: donoSenha } })).d.token;
+await reg(HB, 'admin@b.com', 'AdminB#123', 'Comprador B');
+await reg(HB, 'staff@b.com', 'StaffB#123', 'Funcionario B');
+r = await req('POST', '/api/admin/team', { token: dono, site: B, body: { email: 'admin@b.com', role: 'admin_loja' } }); ok(r.s === 201, 'proprietário torna o comprador administrador da loja B', r);
+ok((await req('POST', '/api/admin/team', { token: dono, site: A, body: { email: 'admin@b.com', role: 'gerente' } })).s === 404, 'e-mail da B não vira equipe da A');
+ok((await req('GET', '/api/admin/team', { token: dev })).s === 403, 'desenvolvedor continua sem acesso à Equipe');
+ok((await req('GET', '/api/admin/team', { token: ger })).s === 403, 'gerente não gerencia equipe');
+const admB = (await req('POST', '/api/auth/login', { host: HB, body: { email: 'admin@b.com', password: 'AdminB#123' } })).d.token;
+const ab = (m, pth, body) => req(m, pth, { token: admB, host: HB, body });
+r = await ab('GET', '/api/admin/team'); ok(r.s === 200 && r.d.membros.length === 1 && r.d.membros[0].email === 'admin@b.com', 'administrador da B vê só a equipe da B', r.d);
+ok(!r.d.papeis.some((x) => x.id === 'dev' || x.id === 'admin_loja'), 'administrador não pode oferecer os níveis dev/administrador');
+ok((await ab('POST', '/api/admin/team', { email: 'staff@b.com', role: 'admin_loja' })).s === 400, 'administrador não cria outro administrador');
+ok((await ab('POST', '/api/admin/team', { email: 'staff@b.com', role: 'dev' })).s === 400, 'administrador não cria desenvolvedor');
+ok((await ab('POST', '/api/admin/team', { email: 'staff@b.com', role: 'gerente' })).s === 201, 'administrador da B monta a própria equipe');
+ok((await ab('POST', '/api/admin/team', { email: 'g@x.com', role: 'gerente' })).s === 404, 'não adiciona conta de outra loja');
+const meuId = (await ab('GET', '/api/admin/team')).d.membros.find((m) => m.email === 'admin@b.com').id;
+ok((await ab('PUT', `/api/admin/team/${meuId}`, { role: 'atendente' })).s === 403, 'administrador não rebaixa o próprio nível reservado');
+ok((await ab('DELETE', `/api/admin/team/${meuId}`)).s === 403, 'administrador não se remove');
+const idGer = (await req('GET', '/api/admin/team', { token: dono })).d.membros.find((m) => m.email === 'g@x.com')?.id;
+ok(idGer && (await ab('PUT', `/api/admin/team/${idGer}`, { role: 'atendente' })).s === 404, 'administrador da B não mexe na equipe da A');
+ok((await req('GET', '/api/admin/products', { token: admB, host: HB, site: A })).s === 403, 'administrador da B não abre o painel da A');
+ok((await ab('GET', '/api/admin/products')).d.length === 1, 'administrador da B vê só os produtos da B');
+r = await ab('GET', '/api/admin/sites'); ok(r.d.length === 1 && r.d[0].id === B, 'administrador da B só vê a B no seletor');
+ok((await ab('POST', '/api/admin/sites', { nome: 'Invasao' })).s === 403, 'administrador não cadastra lojas');
+const staffB = (await req('POST', '/api/auth/login', { host: HB, body: { email: 'staff@b.com', password: 'StaffB#123' } })).d.token;
+ok((await req('GET', '/api/admin/products', { token: staffB, host: HB })).s === 200, 'funcionário da B (gerente) abre o painel da B');
+ok((await req('GET', '/api/admin/team', { token: staffB, host: HB })).s === 403, 'funcionário não gerencia equipe');
 
 console.log(falhas ? `\n${falhas} FALHA(S) de ${total}` : `Isolamento OK (${total} verificações)`);
 process.exit(falhas ? 1 : 0);
