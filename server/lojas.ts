@@ -40,6 +40,7 @@ export function migrarLojas(): { alterou: boolean; backup?: string } {
 const UNICOS: Array<{ tabela: string; campo: string; antigo: RegExp }> = [
   { tabela: 'categories', campo: 'slug', antigo: /\bslug TEXT UNIQUE NOT NULL/ },
   { tabela: 'products', campo: 'slug', antigo: /\bslug TEXT UNIQUE NOT NULL/ },
+  { tabela: 'users', campo: 'email', antigo: /\bemail TEXT UNIQUE NOT NULL COLLATE NOCASE/ },
   { tabela: 'coupons', campo: 'code', antigo: /\bcode TEXT UNIQUE NOT NULL COLLATE NOCASE/ },
 ];
 

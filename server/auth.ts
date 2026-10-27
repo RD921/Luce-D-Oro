@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { db, AUTHORIZED_OWNER, logAudit } from './db.js';
+import { ehGlobal, siteVisitante, SITE_PRINCIPAL } from './sites.js';
 
 // Helper to authenticate request via Cookie or Authorization header
 export interface AuthenticatedRequest extends Request {
@@ -21,13 +22,13 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
   const session = db
     .prepare(
       `
-    SELECT s.token, s.expires_at, u.id, u.name, u.email, u.role
+    SELECT s.token, s.expires_at, u.id, u.name, u.email, u.role, u.site_id
     FROM sessions s
     JOIN users u ON s.user_id = u.id
     WHERE s.token = ?
   `
     )
-    .get(token) as { token: string; expires_at: string; id: number; name: string; email: string; role: string } | undefined;
+    .get(token) as { token: string; expires_at: string; id: number; name: string; email: string; role: string; site_id: string | null } | undefined;
 
   if (!session) {
     res.status(401).json({ error: 'Sessão inválida ou expirada.' });
@@ -37,6 +38,12 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
   if (new Date(session.expires_at).getTime() < Date.now()) {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    return;
+  }
+
+  // A conta pertence a uma loja: só vale no endereço dessa loja (dono e desenvolvedor valem em todas).
+  if (!ehGlobal(session.role) && (session.site_id ?? SITE_PRINCIPAL) !== siteVisitante(req)) {
+    res.status(401).json({ error: 'Sessão inválida para esta loja. Faça login novamente.' });
     return;
   }
 

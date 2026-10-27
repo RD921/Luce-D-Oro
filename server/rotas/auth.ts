@@ -5,6 +5,7 @@ import { db, hashPassword, verifyPassword, AUTHORIZED_OWNER } from '../db.js';
 import { areasDoPapel } from '../adminTeam.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth.js';
 import { limiteLoginConta, limiteLoginIp } from '../limites.js';
+import { siteVisitante } from '../sites.js';
 
 export function registerRotasAuth(app: Express) {
   // ==================== AUTH & SETUP ROUTES ====================
@@ -28,7 +29,8 @@ export function registerRotasAuth(app: Express) {
       return;
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase()) as
+    // A conta é da loja que o cliente está acessando (dono e desenvolvedor entram em qualquer loja)
+    const user = db.prepare("SELECT * FROM users WHERE email = ? AND (site_id = ? OR role IN ('owner','dev')) ORDER BY (site_id = ?) DESC LIMIT 1").get(email.trim().toLowerCase(), siteVisitante(req), siteVisitante(req)) as
       | {
           id: number;
           name: string;
@@ -108,7 +110,7 @@ export function registerRotasAuth(app: Express) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
+    const existing = db.prepare("SELECT id FROM users WHERE email = ? AND (site_id = ? OR role IN ('owner','dev'))").get(cleanEmail, siteVisitante(req));
     if (existing) {
       res.status(409).json({ error: 'Este e-mail já está cadastrado. Tente entrar ou recuperar sua senha.' });
       return;
@@ -118,8 +120,8 @@ export function registerRotasAuth(app: Express) {
 
     // Security: Public registration role is strictly 'customer'
     const result = db
-      .prepare('INSERT INTO users (name, email, password_hash, salt, role, is_verified) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(name.trim(), cleanEmail, hash, salt, 'customer', 0);
+      .prepare('INSERT INTO users (name, email, password_hash, salt, role, is_verified, site_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(name.trim(), cleanEmail, hash, salt, 'customer', 0, siteVisitante(req));
 
     const userId = Number(result.lastInsertRowid);
 
@@ -198,7 +200,7 @@ export function registerRotasAuth(app: Express) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail) as { id: number } | undefined;
+    const user = db.prepare("SELECT id FROM users WHERE email = ? AND (site_id = ? OR role IN ('owner','dev'))").get(cleanEmail, siteVisitante(req)) as { id: number } | undefined;
 
     if (user) {
       const token = crypto.randomBytes(24).toString('hex');

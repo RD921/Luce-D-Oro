@@ -69,6 +69,9 @@ export function resolverSiteAdmin(req: Request, res: Response, next: NextFunctio
   }
   next();
 }
+// Dono e desenvolvedor da plataforma atuam em qualquer loja; os demais (clientes e equipe) pertencem a uma só.
+export const PAPEIS_GLOBAIS = ['owner', 'dev'];
+export const ehGlobal = (role: string) => PAPEIS_GLOBAIS.includes(role);
 export const siteAdmin = (req: Request): string => (req as unknown as { siteId?: string }).siteId ?? SITE_PRINCIPAL;
 
 // Visitante: o site é escolhido pelo endereço (domínio) que ele acessou. Sem correspondência = site principal.
@@ -85,8 +88,12 @@ const dominioOk = (d: string) => /^(localhost|([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])
 export function registerSites(app: Express, painel: (a: Area) => RequestHandler) {
   const quem = (req: Request) => (req as unknown as { user: { id: number; email: string } }).user;
 
-  app.get('/api/admin/sites', painel('conteudo'), (_req: Request, res: Response) => {
-    const sites = db.prepare('SELECT * FROM sites ORDER BY (id = ?) DESC, created_at ASC').all(SITE_PRINCIPAL) as unknown as SiteRow[];
+  app.get('/api/admin/sites', painel('conteudo'), (req: Request, res: Response) => {
+    const u = quem(req) as { id: number; email: string; role?: string };
+    const doUsuario = db.prepare('SELECT role, site_id FROM users WHERE id = ?').get(u.id) as { role: string; site_id: string | null } | undefined;
+    const todos = db.prepare('SELECT * FROM sites ORDER BY (id = ?) DESC, created_at ASC').all(SITE_PRINCIPAL) as unknown as SiteRow[];
+    // Equipe de uma loja só enxerga a própria loja no seletor
+    const sites = doUsuario && !ehGlobal(doUsuario.role) ? todos.filter((s) => s.id === (doUsuario.site_id ?? SITE_PRINCIPAL)) : todos;
     const cont = (sql: string, id: string) => (db.prepare(sql).get(id) as { n: number; u?: string }) ;
     res.json(sites.map((s) => ({
       ...s,

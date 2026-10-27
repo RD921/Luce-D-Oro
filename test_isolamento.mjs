@@ -84,12 +84,32 @@ r = await req('POST', '/api/coupons/validate', { body: { code: 'IGUAL10', cartTo
 r = await req('GET', '/api/checkout/options', { host: HB }); ok(r.d.shipping.length === 1 && r.d.shipping[0].id === fretB && r.d.payments.length === 1, 'opções de checkout da B são só da B', r.d);
 r = await req('GET', '/api/checkout/options'); ok(!r.d.shipping.some((x) => x.id === fretB), 'opções de checkout da A não têm o frete da B');
 
+// ---- Contas separadas por loja
+const reg = (host, email, senha, nome = 'Cliente') => req('POST', '/api/auth/register', { host, body: { name: nome, email, password: senha, confirmPassword: senha } });
+r = await reg(HB, 'c@x.com', 'SenhaDaB1', 'Cliente da B'); ok(r.s === 201 || r.s === 200, 'o mesmo e-mail cadastra na loja B', r);
+const cliB = r.d?.token;
+ok((await reg(HB, 'c@x.com', 'OutraSenha1')).s === 409, 'e-mail repetido na mesma loja é recusado');
+ok((await req('POST', '/api/auth/login', { host: HB, body: { email: 'c@x.com', password: 'x' } })).s === 401, 'senha da conta da A não entra na B');
+ok((await req('POST', '/api/auth/login', { body: { email: 'c@x.com', password: 'SenhaDaB1' } })).s === 401, 'senha da conta da B não entra na A');
+ok((await req('POST', '/api/auth/login', { host: HB, body: { email: 'c@x.com', password: 'SenhaDaB1' } })).s === 200, 'conta da B entra na B');
+ok((await req('POST', '/api/auth/login', { body: { email: 'c@x.com', password: 'x' } })).s === 200, 'conta da A entra na A');
+ok((await req('GET', '/api/cart', { token: cli, host: HB })).s === 401, 'sessão de cliente da A não vale na B');
+ok((await req('GET', '/api/cart', { token: cliB })).s === 401, 'sessão de cliente da B não vale na A');
+ok((await req('GET', '/api/cart', { token: dev, host: HB })).s === 200, 'desenvolvedor da plataforma vale em qualquer loja');
+const emailsB = (await b('GET', '/api/admin/customers')).d.map((x) => x.email);
+ok(emailsB.length === 1 && emailsB[0] === 'c@x.com', 'clientes da B: só quem se cadastrou na B', emailsB);
+ok(!(await a('GET', '/api/admin/customers')).d.some((x) => x.name === 'Cliente da B'), 'clientes da A não incluem o da B');
+const ger = await login('g@x.com', 'Gerente#12345');
+ok((await req('GET', '/api/admin/products', { token: ger, site: B })).s === 403, 'gerente da A não abre o painel da B');
+ok((await req('GET', '/api/admin/products', { token: ger })).s === 200, 'gerente da A abre o painel da A');
+r = await req('GET', '/api/admin/sites', { token: ger }); ok(r.d.length === 1 && r.d[0].id === A, 'gerente só vê a própria loja no seletor');
+
 // ---- Sacola e pedido
+ok((await req('POST', '/api/cart/items', { token: cliB, host: HB, body: { productId: 'prod_riviera', quantity: 1 } })).s === 404, 'cliente não coloca produto da A na sacola pela vitrine da B');
 ok((await req('POST', '/api/cart/items', { token: cli, body: { productId: prodB, quantity: 1 } })).s === 404, 'cliente não coloca produto da B na sacola pela vitrine da A');
-ok((await req('POST', '/api/cart/items', { token: cli, host: HB, body: { productId: 'prod_riviera', quantity: 1 } })).s === 404, 'cliente não coloca produto da A na sacola pela vitrine da B');
-r = await req('POST', '/api/cart/items', { token: cli, host: HB, body: { productId: prodB, quantity: 1 } }); ok(r.s === 200 || r.s === 201, 'coloca produto da B na sacola da B', r);
-r = await req('GET', '/api/cart', { token: cli }); ok(r.d.items.length === 0, 'a sacola vista na vitrine da A não mostra item da B');
-r = await req('POST', '/api/orders', { token: cli, host: HB, body: { shippingAddress: 'Rua B, 1', paymentMethodId: pagB, shippingMethodId: fretB, couponCode: 'IGUAL10' } });
+r = await req('POST', '/api/cart/items', { token: cliB, host: HB, body: { productId: prodB, quantity: 1 } }); ok(r.s === 200 || r.s === 201, 'coloca produto da B na sacola da B', r);
+r = await req('GET', '/api/cart', { token: cli }); ok(r.d.items.length === 0, 'a sacola do cliente da A não mostra item da B');
+r = await req('POST', '/api/orders', { token: cliB, host: HB, body: { shippingAddress: 'Rua B, 1', paymentMethodId: pagB, shippingMethodId: fretB, couponCode: 'IGUAL10' } });
 ok(r.s === 201 || r.s === 200, 'pedido na loja B', r);
 ok(r.d?.total === 100 && r.d?.shippingCost === 10, 'total = 100 - 10% de cupom da B + frete 10 da B', r.d);
 ok((await b('GET', '/api/admin/orders')).d.length === 1, 'pedido aparece na B');
@@ -97,8 +117,8 @@ ok((await a('GET', '/api/admin/orders')).d.every((o) => o.id !== r.d.orderId), '
 const pedido = r.d.orderId;
 ok((await a('PUT', `/api/admin/orders/${pedido}/status`, { status: 'Enviado' })).s === 404, 'A não altera pedido da B');
 ok((await b('PUT', `/api/admin/orders/${pedido}/status`, { status: 'Enviado' })).s === 200, 'B altera o próprio pedido');
-r = await b('GET', '/api/admin/dashboard'); ok(r.s === 200 && r.d.summary?.totalOrders !== undefined ? true : r.s === 200, 'dashboard da B abre');
-r = await a('GET', '/api/admin/dashboard'); ok(r.s === 200, 'dashboard da A abre');
+ok((await b('GET', '/api/admin/dashboard')).s === 200, 'dashboard da B abre');
+ok((await a('GET', '/api/admin/dashboard')).s === 200, 'dashboard da A abre');
 
 console.log(falhas ? `\n${falhas} FALHA(S) de ${total}` : `Isolamento OK (${total} verificações)`);
 process.exit(falhas ? 1 : 0);

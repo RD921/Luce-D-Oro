@@ -2,6 +2,7 @@
 import type { Express, Request, Response, NextFunction, RequestHandler } from 'express';
 import { db, logAudit, AUTHORIZED_OWNER } from './db.js';
 import { migrarCupons } from './servicos/cupons.js';
+import { siteAdmin, ehGlobal, SITE_PRINCIPAL } from './sites.js';
 
 type Usuario = { id: number; name: string; email: string; role: string };
 const quem = (req: Request): Usuario => (req as unknown as { user: Usuario }).user;
@@ -51,6 +52,14 @@ export function criarPainel(authMiddleware: RequestHandler) {
         if (!u) { res.status(401).json({ error: 'Não autorizado. Autenticação obrigatória.' }); return; }
         if (ehDono(u)) { next(); return; }
 
+        // Equipe de uma loja só trabalha na própria loja (desenvolvedor da plataforma atua em qualquer uma)
+        if (!ehGlobal(u.role)) {
+          const minha = (db.prepare('SELECT site_id FROM users WHERE id = ?').get(u.id) as { site_id: string | null } | undefined)?.site_id ?? SITE_PRINCIPAL;
+          const pedida = String(req.headers['x-site-id'] || '').trim();
+          if (pedida && pedida !== minha) { res.status(403).json({ error: 'Seu acesso é só da sua loja.' }); return; }
+          (req as unknown as { siteId: string }).siteId = minha;
+        }
+
         const nivel = areasDoPapel(u.role)[area];
         const leitura = req.method === 'GET' || req.method === 'HEAD';
         if (nivel && (nivel === 'rw' || leitura)) { next(); return; }
@@ -74,7 +83,7 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
 
   // ---------- Ficha do cliente ----------
   app.get('/api/admin/customers/:id', painel('clientes'), (req: Request, res: Response) => {
-    const cliente = db.prepare('SELECT id, name, email, role, is_verified, created_at FROM users WHERE id = ?').get(Number(req.params.id)) as Record<string, unknown> | undefined;
+    const cliente = db.prepare('SELECT id, name, email, role, is_verified, created_at FROM users WHERE id = ? AND (site_id = ? OR (site_id IS NULL AND ? = ?))').get(Number(req.params.id), siteAdmin(req), siteAdmin(req), SITE_PRINCIPAL) as Record<string, unknown> | undefined;
     if (!cliente) { res.status(404).json({ error: 'Cliente não encontrado.' }); return; }
     const pedidos = db.prepare('SELECT id, total, status, payment_method, tracking_code, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 100').all(Number(req.params.id));
     const resumo = db.prepare("SELECT COUNT(*) AS pedidos, COALESCE(SUM(total),0) AS gasto FROM orders WHERE user_id = ? AND status != 'Cancelado'").get(Number(req.params.id));
@@ -82,10 +91,10 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
   });
 
   // ---------- Equipe (somente o proprietário) ----------
-  app.get('/api/admin/team', ownerOnly, (_req: Request, res: Response) => {
+  app.get('/api/admin/team', ownerOnly, (req: Request, res: Response) => {
     const membros = db
-      .prepare(`SELECT id, name, email, role, created_at FROM users WHERE role IN (${Object.keys(PAPEIS).map(() => '?').join(',')}) ORDER BY name`)
-      .all(...Object.keys(PAPEIS));
+      .prepare(`SELECT id, name, email, role, created_at FROM users WHERE role IN (${Object.keys(PAPEIS).map(() => '?').join(',')}) AND site_id = ? ORDER BY name`)
+      .all(...Object.keys(PAPEIS), siteAdmin(req));
     res.json({
       membros,
       papeis: Object.entries(PAPEIS).map(([id, p]) => ({ id, label: p.label, descricao: p.descricao, areas: p.areas })),
@@ -97,8 +106,8 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
     const papel = String(req.body?.role || '');
     if (!PAPEIS[papel]) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
     if (email === AUTHORIZED_OWNER.email.toLowerCase()) { res.status(400).json({ error: 'A conta do proprietário não pode ser alterada aqui.' }); return; }
-    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE lower(email) = ?').get(email) as Usuario | undefined;
-    if (!alvo) { res.status(404).json({ error: 'Essa pessoa ainda não tem conta. Peça para ela se cadastrar na loja e tente de novo.' }); return; }
+    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE lower(email) = ? AND site_id = ?').get(email, siteAdmin(req)) as Usuario | undefined;
+    if (!alvo) { res.status(404).json({ error: 'Essa pessoa ainda não tem conta. Peça para ela se cadastrar nesta loja e tente de novo.' }); return; }
     if (alvo.role === 'owner') { res.status(400).json({ error: 'Esta conta é de proprietário e não pode ser alterada.' }); return; }
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run(papel, alvo.id);
     const u = quem(req);
@@ -109,7 +118,7 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
   app.put('/api/admin/team/:id', ownerOnly, (req: Request, res: Response) => {
     const papel = String(req.body?.role || '');
     if (!PAPEIS[papel]) { res.status(400).json({ error: 'Escolha um nível de acesso válido.' }); return; }
-    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(Number(req.params.id)) as Usuario | undefined;
+    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ? AND site_id = ?').get(Number(req.params.id), siteAdmin(req)) as Usuario | undefined;
     if (!alvo || !PAPEIS[alvo.role]) { res.status(404).json({ error: 'Membro da equipe não encontrado.' }); return; }
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run(papel, alvo.id);
     const u = quem(req);
@@ -118,7 +127,7 @@ export function registerAdminTeam(app: Express, painel: (a: Area) => RequestHand
   });
 
   app.delete('/api/admin/team/:id', ownerOnly, (req: Request, res: Response) => {
-    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(Number(req.params.id)) as Usuario | undefined;
+    const alvo = db.prepare('SELECT id, name, email, role FROM users WHERE id = ? AND site_id = ?').get(Number(req.params.id), siteAdmin(req)) as Usuario | undefined;
     if (!alvo || !PAPEIS[alvo.role]) { res.status(404).json({ error: 'Membro da equipe não encontrado.' }); return; }
     db.prepare("UPDATE users SET role = 'customer' WHERE id = ?").run(alvo.id);
     const u = quem(req);
