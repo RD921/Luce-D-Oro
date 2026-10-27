@@ -2,11 +2,13 @@ import { Response } from 'express';
 import type { Express } from 'express';
 import { db, AUTHORIZED_OWNER } from '../db.js';
 import { criarPainel } from '../adminTeam.js';
+import { siteAdmin, SITE_PRINCIPAL } from '../sites.js';
 import { type AuthenticatedRequest } from '../auth.js';
 
 export function registerAdminClientes(app: Express, painel: ReturnType<typeof criarPainel>) {
   // 8. Admin Customers
-  app.get('/api/admin/customers', painel('clientes'), (_req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/admin/customers', painel('clientes'), (req: AuthenticatedRequest, res: Response) => {
+    const loja = siteAdmin(req);
     const customers = db
       .prepare(
         `
@@ -15,12 +17,13 @@ export function registerAdminClientes(app: Express, painel: ReturnType<typeof cr
              COALESCE(SUM(o.total), 0) as total_spent,
              MAX(o.created_at) as last_order_date
       FROM users u
-      LEFT JOIN orders o ON u.id = o.user_id AND o.status != 'Cancelado'
+      LEFT JOIN orders o ON u.id = o.user_id AND o.status != 'Cancelado' AND o.site_id = ?
+      WHERE (u.site_id = ? OR (u.site_id IS NULL AND ? = '${SITE_PRINCIPAL}'))
       GROUP BY u.id
       ORDER BY total_spent DESC, orders_count DESC
     `
       )
-      .all();
+      .all(loja, loja, loja);
 
     res.json(customers);
   });
@@ -36,11 +39,12 @@ export function registerAdminClientes(app: Express, painel: ReturnType<typeof cr
   });
 
   // 10. Admin Real-time Alerts
-  app.get('/api/admin/alerts', painel('dashboard'), (_req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/admin/alerts', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
+    const loja = siteAdmin(req);
     const alerts: Array<{ id: string; type: 'warning' | 'info' | 'danger'; title: string; message: string; link?: string }> = [];
 
     // Low stock alerts
-    const lowStock = (db.prepare('SELECT COUNT(*) as count FROM products WHERE stock <= 5 AND is_archived = 0').get() as { count: number }).count;
+    const lowStock = (db.prepare('SELECT COUNT(*) as count FROM products WHERE stock <= 5 AND is_archived = 0 AND site_id = ?').get(loja) as { count: number }).count;
     if (lowStock > 0) {
       alerts.push({
         id: 'alert_low_stock',
@@ -52,7 +56,7 @@ export function registerAdminClientes(app: Express, painel: ReturnType<typeof cr
     }
 
     // Pending shipments
-    const pendingShipments = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'Confirmado' OR status = 'Em Preparação'").get() as { count: number }).count;
+    const pendingShipments = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE site_id = ? AND (status = 'Confirmado' OR status = 'Em Preparação')").get(loja) as { count: number }).count;
     if (pendingShipments > 0) {
       alerts.push({
         id: 'alert_orders_pending',

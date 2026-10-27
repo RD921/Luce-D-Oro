@@ -2,12 +2,14 @@ import { Response } from 'express';
 import type { Express } from 'express';
 import { db } from '../db.js';
 import { criarPainel } from '../adminTeam.js';
+import { siteAdmin, SITE_PRINCIPAL } from '../sites.js';
 import { type AuthenticatedRequest } from '../auth.js';
 
 export function registerAdminDashboard(app: Express, painel: ReturnType<typeof criarPainel>) {
   // 1. Admin Dashboard Overview
   app.get('/api/admin/dashboard', painel('dashboard'), (req: AuthenticatedRequest, res: Response) => {
     const { period = 'all' } = req.query;
+    const loja = siteAdmin(req);
 
     let dateFilter = '';
     if (period === 'today') {
@@ -20,7 +22,7 @@ export function registerAdminDashboard(app: Express, painel: ReturnType<typeof c
       dateFilter = " AND datetime(created_at) >= datetime('now', '-90 days')";
     }
 
-    const allOrders = db.prepare(`SELECT * FROM orders WHERE 1=1 ${dateFilter} ORDER BY created_at DESC`).all() as any[];
+    const allOrders = db.prepare(`SELECT * FROM orders WHERE site_id = ? ${dateFilter} ORDER BY created_at DESC`).all(loja) as any[];
 
     const ordersCount = allOrders.length;
     const statusCounts: Record<string, number> = {
@@ -52,12 +54,12 @@ export function registerAdminDashboard(app: Express, painel: ReturnType<typeof c
 
     // Inventory stats
     const lowStockRows = db
-      .prepare('SELECT id, name, stock, price, category_id, image_primary FROM products WHERE stock <= 5 AND is_archived = 0 ORDER BY stock ASC')
-      .all() as any[];
+      .prepare('SELECT id, name, stock, price, category_id, image_primary FROM products WHERE stock <= 5 AND is_archived = 0 AND site_id = ? ORDER BY stock ASC')
+      .all(loja) as any[];
     const outOfStockCount = lowStockRows.filter((p) => p.stock === 0).length;
 
     // Active coupons
-    const activeCoupons = (db.prepare('SELECT COUNT(*) as count FROM coupons WHERE is_active = 1').get() as { count: number }).count;
+    const activeCoupons = (db.prepare('SELECT COUNT(*) as count FROM coupons WHERE is_active = 1 AND site_id = ?').get(loja) as { count: number }).count;
 
     // Top Products from order_items
     const topProducts = db
@@ -66,13 +68,13 @@ export function registerAdminDashboard(app: Express, painel: ReturnType<typeof c
       SELECT oi.product_id, oi.product_name, oi.image_url, SUM(oi.quantity) as total_sold, SUM(oi.unit_price * oi.quantity) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
-      WHERE o.status != 'Cancelado' ${dateFilter.replace(/created_at/g, 'o.created_at')}
+      WHERE o.site_id = ? AND o.status != 'Cancelado' ${dateFilter.replace(/created_at/g, 'o.created_at')}
       GROUP BY oi.product_id
       ORDER BY total_sold DESC
       LIMIT 5
     `
       )
-      .all();
+      .all(loja);
 
     // Recent 8 orders with user name
     const recentOrders = allOrders.slice(0, 8).map((o) => {
@@ -87,7 +89,7 @@ export function registerAdminDashboard(app: Express, painel: ReturnType<typeof c
     });
 
     // Total registered customers
-    const totalCustomers = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'customer'").get() as { count: number }).count;
+    const totalCustomers = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'customer' AND (site_id = ? OR (site_id IS NULL AND ? = '"+SITE_PRINCIPAL+"'))").get(loja, loja) as { count: number }).count;
 
     res.json({
       period,

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import type { Express } from 'express';
 import { db } from '../db.js';
+import { siteVisitante } from '../sites.js';
 import { criarPedido } from '../servicos/pedidos.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth.js';
 
@@ -20,7 +21,7 @@ export function registerPedidos(app: Express) {
   });
 
   app.post('/api/orders', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
-    const r = criarPedido(req.user!.id, req.body ?? {});
+    const r = criarPedido(req.user!.id, siteVisitante(req), req.body ?? {});
     if (!r.ok) {
       res.status(r.status).json({ error: r.erro });
       return;

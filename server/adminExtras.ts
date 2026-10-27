@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, logAudit } from './db.js';
 import type { Area } from './adminTeam.js';
+import { siteAdmin, SITE_PRINCIPAL } from './sites.js';
 
 type Owner = { id: number; email: string };
 const dono = (req: Request): Owner => (req as unknown as { user: Owner }).user;
@@ -74,13 +75,13 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
   });
 
   // ---------- Categorias ----------
-  app.get('/api/admin/categories', painel('categorias'), (_req: Request, res: Response) => {
+  app.get('/api/admin/categories', painel('categorias'), (req: Request, res: Response) => {
     const lista = db
       .prepare(
         `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_archived = 0) AS product_count
-         FROM categories c ORDER BY c.display_order ASC, c.name ASC`
+         FROM categories c WHERE c.site_id = ? ORDER BY c.display_order ASC, c.name ASC`
       )
-      .all();
+      .all(siteAdmin(req));
     res.json(lista);
   });
 
@@ -91,35 +92,38 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
     let slug = slugify(req.body?.slug || nome);
     if (!slug) { res.status(400).json({ error: 'Nome inválido para gerar o endereço da categoria.' }); return; }
     if (['home', 'admin', 'api', 'uploads'].includes(slug)) slug = `${slug}-colecao`;
-    if (db.prepare('SELECT id FROM categories WHERE id = ? OR slug = ?').get(slug, slug)) {
+    const loja = siteAdmin(req);
+    // Na loja principal o id é o próprio endereço; nas demais leva o sufixo da loja, porque o id é único no banco todo.
+    const idCat = loja === SITE_PRINCIPAL ? slug : `${slug}~${loja}`;
+    if (db.prepare('SELECT id FROM categories WHERE id = ? OR (slug = ? AND site_id = ?)').get(idCat, slug, loja)) {
       res.status(409).json({ error: `Já existe uma categoria com o endereço "${slug}".` });
       return;
     }
     const ordem = Number.isFinite(Number(display_order))
       ? Number(display_order)
-      : ((db.prepare('SELECT COALESCE(MAX(display_order),0) AS m FROM categories').get() as { m: number }).m + 1);
-    db.prepare('INSERT INTO categories (id, name, slug, description, image_url, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(slug, nome, slug, String(description), String(image_url), ordem, is_active ? 1 : 0);
+      : ((db.prepare('SELECT COALESCE(MAX(display_order),0) AS m FROM categories WHERE site_id = ?').get(loja) as { m: number }).m + 1);
+    db.prepare('INSERT INTO categories (id, name, slug, description, image_url, display_order, is_active, site_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(idCat, nome, slug, String(description), String(image_url), ordem, is_active ? 1 : 0, loja);
     const u = dono(req);
-    logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_CREATED', entity: 'CATEGORIES', entityId: slug, details: { name: nome } });
-    res.status(201).json({ success: true, id: slug, message: 'Categoria criada.' });
+    logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_CREATED', entity: 'CATEGORIES', entityId: idCat, details: { name: nome } });
+    res.status(201).json({ success: true, id: idCat, message: 'Categoria criada.' });
   });
 
   app.put('/api/admin/categories/:id', painel('categorias'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const atual = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const atual = db.prepare('SELECT * FROM categories WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as Record<string, unknown> | undefined;
     if (!atual) { res.status(404).json({ error: 'Categoria não encontrada.' }); return; }
     const b = req.body || {};
     const nome = b.name !== undefined ? String(b.name).trim() : String(atual.name);
     if (!nome) { res.status(400).json({ error: 'O nome da categoria é obrigatório.' }); return; }
     // O endereço (slug) não muda: links, produtos e histórico dependem dele.
-    db.prepare('UPDATE categories SET name = ?, description = ?, image_url = ?, display_order = ?, is_active = ? WHERE id = ?').run(
+    db.prepare('UPDATE categories SET name = ?, description = ?, image_url = ?, display_order = ?, is_active = ? WHERE id = ? AND site_id = ?').run(
       nome,
       b.description !== undefined ? String(b.description) : String(atual.description ?? ''),
       b.image_url !== undefined ? String(b.image_url) : String(atual.image_url ?? ''),
       Number.isFinite(Number(b.display_order)) ? Number(b.display_order) : Number(atual.display_order ?? 0),
       b.is_active !== undefined ? (b.is_active ? 1 : 0) : Number(atual.is_active ?? 1),
-      id
+      id, siteAdmin(req)
     );
     const u = dono(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_UPDATED', entity: 'CATEGORIES', entityId: id, details: { name: nome } });
@@ -128,24 +132,24 @@ export function registerAdminExtras(app: Express, painel: (a: Area) => RequestHa
 
   app.delete('/api/admin/categories/:id', painel('categorias'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const atual = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id) as { id: string; name: string } | undefined;
+    const atual = db.prepare('SELECT id, name FROM categories WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as { id: string; name: string } | undefined;
     if (!atual) { res.status(404).json({ error: 'Categoria não encontrada.' }); return; }
     // Produtos (inclusive arquivados) e pedidos antigos dependem da categoria: só apaga se estiver vazia,
     // ou se o painel pedir para mover os produtos para outra categoria (?moveTo=...).
-    const usados = (db.prepare('SELECT COUNT(*) AS n FROM products WHERE category_id = ?').get(id) as { n: number }).n;
+    const usados = (db.prepare('SELECT COUNT(*) AS n FROM products WHERE category_id = ? AND site_id = ?').get(id, siteAdmin(req)) as { n: number }).n;
     const destino = typeof req.query.moveTo === 'string' ? req.query.moveTo : '';
     if (usados > 0) {
       if (!destino) {
         res.status(409).json({ error: `Esta categoria tem ${usados} produto(s) (contando os arquivados). Mova-os para outra categoria ou desative a categoria em vez de excluir.`, products: usados });
         return;
       }
-      if (destino === id || !db.prepare('SELECT id FROM categories WHERE id = ?').get(destino)) {
+      if (destino === id || !db.prepare('SELECT id FROM categories WHERE id = ? AND site_id = ?').get(destino, siteAdmin(req))) {
         res.status(400).json({ error: 'Categoria de destino inválida.' });
         return;
       }
-      db.prepare('UPDATE products SET category_id = ? WHERE category_id = ?').run(destino, id);
+      db.prepare('UPDATE products SET category_id = ? WHERE category_id = ? AND site_id = ?').run(destino, id, siteAdmin(req));
     }
-    db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    db.prepare('DELETE FROM categories WHERE id = ? AND site_id = ?').run(id, siteAdmin(req));
     const u = dono(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'CATEGORY_DELETED', entity: 'CATEGORIES', entityId: id, details: { name: atual.name, movidos: usados, destino: destino || null } });
     res.json({ success: true, message: 'Categoria excluída.' });

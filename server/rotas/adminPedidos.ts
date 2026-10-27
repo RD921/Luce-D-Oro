@@ -2,6 +2,7 @@ import { Response } from 'express';
 import type { Express } from 'express';
 import { db, logAudit } from '../db.js';
 import { criarPainel } from '../adminTeam.js';
+import { siteAdmin } from '../sites.js';
 import { type AuthenticatedRequest } from '../auth.js';
 
 export function registerAdminPedidos(app: Express, painel: ReturnType<typeof criarPainel>) {
@@ -13,9 +14,9 @@ export function registerAdminPedidos(app: Express, painel: ReturnType<typeof cri
       SELECT o.*, u.name as customer_name, u.email as customer_email
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      WHERE 1=1
+      WHERE o.site_id = ?
     `;
-    const params: any[] = [];
+    const params: any[] = [siteAdmin(req)];
 
     if (status && status !== 'all') {
       query += ' AND o.status = ?';
@@ -43,7 +44,7 @@ export function registerAdminPedidos(app: Express, painel: ReturnType<typeof cri
     const id = String(req.params.id);
     const { status, trackingCode, internalNotes } = req.body;
 
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as any;
     if (!order) {
       res.status(404).json({ error: 'Pedido não encontrado.' });
       return;

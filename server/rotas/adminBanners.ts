@@ -2,12 +2,13 @@ import { Response } from 'express';
 import type { Express } from 'express';
 import { db, logAudit } from '../db.js';
 import { criarPainel } from '../adminTeam.js';
+import { siteAdmin } from '../sites.js';
 import { type AuthenticatedRequest } from '../auth.js';
 
 export function registerAdminBanners(app: Express, painel: ReturnType<typeof criarPainel>) {
   // 5. Admin Banners
-  app.get('/api/admin/banners', painel('banners'), (_req: AuthenticatedRequest, res: Response) => {
-    const banners = db.prepare('SELECT * FROM banners ORDER BY display_order ASC, created_at DESC').all();
+  app.get('/api/admin/banners', painel('banners'), (req: AuthenticatedRequest, res: Response) => {
+    const banners = db.prepare('SELECT * FROM banners WHERE site_id = ? ORDER BY display_order ASC, created_at DESC').all(siteAdmin(req));
     res.json(banners);
   });
 
@@ -21,9 +22,9 @@ export function registerAdminBanners(app: Express, painel: ReturnType<typeof cri
 
     const id = `banner_${Date.now().toString(36)}`;
     db.prepare(`
-      INSERT INTO banners (id, title, subtitle, badge, cta_text, cta_link, image_desktop, is_active, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, title, subtitle || '', badge || '', cta_text || 'Descubra', cta_link || '#pulseiras', image_desktop, is_active ? 1 : 0, display_order);
+      INSERT INTO banners (id, title, subtitle, badge, cta_text, cta_link, image_desktop, is_active, display_order, site_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, title, subtitle || '', badge || '', cta_text || 'Descubra', cta_link || '#pulseiras', image_desktop, is_active ? 1 : 0, display_order, siteAdmin(req));
 
     logAudit({
       userId: req.user!.id,
@@ -51,7 +52,7 @@ export function registerAdminBanners(app: Express, painel: ReturnType<typeof cri
         image_desktop = COALESCE(?, image_desktop),
         is_active = COALESCE(?, is_active),
         display_order = COALESCE(?, display_order)
-      WHERE id = ?
+      WHERE id = ? AND site_id = ?
     `).run(
       title || null,
       subtitle !== undefined ? subtitle : null,
@@ -61,7 +62,7 @@ export function registerAdminBanners(app: Express, painel: ReturnType<typeof cri
       image_desktop || null,
       is_active !== undefined ? (is_active ? 1 : 0) : null,
       display_order !== undefined ? display_order : null,
-      id
+      id, siteAdmin(req)
     );
 
     logAudit({
@@ -78,7 +79,7 @@ export function registerAdminBanners(app: Express, painel: ReturnType<typeof cri
 
   app.delete('/api/admin/banners/:id', painel('banners'), (req: AuthenticatedRequest, res: Response) => {
     const id = String(req.params.id);
-    db.prepare('DELETE FROM banners WHERE id = ?').run(id);
+    db.prepare('DELETE FROM banners WHERE id = ? AND site_id = ?').run(id, siteAdmin(req));
 
     logAudit({
       userId: req.user!.id,

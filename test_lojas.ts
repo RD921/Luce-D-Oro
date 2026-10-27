@@ -47,7 +47,7 @@ ok(r2.alterou === false && backupsDepois === backupsAntes + 1, 'segunda execuç�
 
 // linhas novas sem informar a loja caem na principal (comportamento atual preservado)
 const cat = (db.prepare('SELECT id FROM categories LIMIT 1').get() as { id: string }).id;
-const np = criarProduto({ id: (db.prepare('SELECT id FROM users LIMIT 1').get() as { id: number }).id, email: 'x@x.com' }, { name: 'Teste Lojas', category_id: cat, price: 10, stock: 1, image_primary: '/x.jpg' });
+const np = criarProduto('luce-d-oro', { id: (db.prepare('SELECT id FROM users LIMIT 1').get() as { id: number }).id, email: 'x@x.com' }, { name: 'Teste Lojas', category_id: cat, price: 10, stock: 1, image_primary: '/x.jpg' });
 ok(np.ok, 'produto de teste criado pelo serviço', np);
 ok((db.prepare("SELECT site_id FROM products WHERE id = ?").get(np.ok ? np.id : '') as { site_id: string }).site_id === SITE_PRINCIPAL, 'produto novo sem site informado vai para a loja principal');
 

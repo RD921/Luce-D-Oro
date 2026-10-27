@@ -16,7 +16,7 @@ export type ResultadoPedido =
   | { ok: true; orderId: string; total: number; shippingCost: number; paymentDiscount: number }
   | { ok: false; status: number; erro: string };
 
-export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPedido {
+export function criarPedido(userId: number, siteId: string, entrada: EntradaPedido): ResultadoPedido {
   const { shippingAddress, paymentMethod, paymentMethodId, couponCode } = entrada;
 
   if (!shippingAddress || (!paymentMethod && !paymentMethodId)) {
@@ -34,10 +34,10 @@ export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPe
     SELECT ci.*, p.name, p.price, p.image_primary, ${ESTOQUE_SQL} AS stock
     FROM cart_items ci
     JOIN products p ON ci.product_id = p.id
-    WHERE ci.cart_id = ?
+    WHERE ci.cart_id = ? AND p.site_id = ?
   `
     )
-    .all(cart.id) as Array<{
+    .all(cart.id, siteId) as Array<{
     id: number;
     product_id: string;
     variant_title: string;
@@ -64,7 +64,7 @@ export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPe
   let cupomUsado: string | null = null;
 
   if (couponCode) {
-    const coupon = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(couponCode).trim().toUpperCase()) as any;
+    const coupon = db.prepare('SELECT * FROM coupons WHERE code = ? AND site_id = ?').get(String(couponCode).trim().toUpperCase(), siteId) as any;
     if (coupon && !motivoCupomInvalido(coupon, userId, subtotal)) {
       discount = calcularDesconto(coupon, subtotal);
       cupomUsado = coupon.id;
@@ -72,11 +72,11 @@ export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPe
   }
 
   // Pagamento e entrega: sempre calculados aqui no servidor, nunca confiados ao navegador
-  const pag = resolverPagamento(entrada);
+  const pag = resolverPagamento(entrada, siteId);
   if (pag.erro) {
     return { ok: false, status: 400, erro: pag.erro };
   }
-  const entrega = resolverEntrega(entrada.shippingMethodId, subtotal);
+  const entrega = resolverEntrega(entrada.shippingMethodId, subtotal, siteId);
   if (entrega.erro) {
     return { ok: false, status: 400, erro: entrega.erro };
   }
@@ -88,8 +88,8 @@ export function criarPedido(userId: number, entrada: EntradaPedido): ResultadoPe
   try {
     emTransacao(() => {
       db.prepare(
-        'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method, shipping_method, shipping_cost, coupon_discount, payment_discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(orderId, userId, total, 'Confirmado', shippingAddress as string, pag.descricao || paymentMethod || null, entrega.metodo?.name ?? null, entrega.custo, discount, descontoPagamento);
+        'INSERT INTO orders (id, user_id, total, status, shipping_address, payment_method, shipping_method, shipping_cost, coupon_discount, payment_discount, site_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(orderId, userId, total, 'Confirmado', shippingAddress as string, pag.descricao || paymentMethod || null, entrega.metodo?.name ?? null, entrega.custo, discount, descontoPagamento, siteId);
       if (cupomUsado) registrarUsoCupom(cupomUsado, userId, orderId);
 
       const insertOrderItem = db.prepare(`

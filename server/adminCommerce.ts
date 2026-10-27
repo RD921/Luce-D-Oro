@@ -2,6 +2,7 @@
 import type { Express, Request, Response, RequestHandler } from 'express';
 import { db, logAudit } from './db.js';
 import type { Area } from './adminTeam.js';
+import { siteAdmin, siteVisitante, SITE_PRINCIPAL } from './sites.js';
 
 type Usuario = { id: number; email: string };
 const quem = (req: Request): Usuario => (req as unknown as { user: Usuario }).user;
@@ -87,24 +88,27 @@ export function prazoTexto(m: Pick<Entrega, 'days_min' | 'days_max'>): string {
   return m.days_min === m.days_max ? `${m.days_min} dias úteis` : `${m.days_min} a ${m.days_max} dias úteis`;
 }
 
-export function entregasAtivas(): Entrega[] {
-  return db.prepare('SELECT * FROM shipping_methods WHERE is_active = 1 ORDER BY display_order, name').all() as unknown as Entrega[];
+export function entregasAtivas(siteId: string): Entrega[] {
+  return db.prepare('SELECT * FROM shipping_methods WHERE is_active = 1 AND site_id = ? ORDER BY display_order, name').all(siteId) as unknown as Entrega[];
 }
 
 // Menor valor a partir do qual algum frete fica grátis (alimenta a barra da sacola)
-export function limiteFreteGratis(): number | null {
-  const v = entregasAtivas().map((m) => m.free_above).filter((x): x is number => x !== null && x !== undefined);
+export function limiteFreteGratis(siteId: string): number | null {
+  const v = entregasAtivas(siteId).map((m) => m.free_above).filter((x): x is number => x !== null && x !== undefined);
   return v.length ? Math.min(...v) : null;
 }
 
-function sincronizarLimite() {
-  const l = limiteFreteGratis();
-  if (l !== null) db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('free_shipping_threshold', ?)").run(l.toFixed(2));
+// Guarda o limite de frete grátis da loja (a loja principal mantém também o ajuste antigo, que o site ainda lê).
+function sincronizarLimite(siteId: string) {
+  const l = limiteFreteGratis(siteId);
+  if (l === null) return;
+  if (siteId === SITE_PRINCIPAL) db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('free_shipping_threshold', ?)").run(l.toFixed(2));
+  db.prepare("INSERT OR REPLACE INTO site_settings (site_id, key, value) VALUES (?, 'free_shipping_threshold', ?)").run(siteId, l.toFixed(2));
 }
 
 // Escolhe o frete do pedido. Sem id: usa o primeiro ativo. Sem nenhum ativo: frete zero.
-export function resolverEntrega(id: unknown, subtotal: number): { erro?: string; metodo?: Entrega; custo: number } {
-  const ativos = entregasAtivas();
+export function resolverEntrega(id: unknown, subtotal: number, siteId: string): { erro?: string; metodo?: Entrega; custo: number } {
+  const ativos = entregasAtivas(siteId);
   if (ativos.length === 0) return { custo: 0 };
   const m = id ? ativos.find((x) => x.id === String(id)) : ativos[0];
   if (!m) return { erro: 'Forma de entrega indisponível. Escolha outra.', custo: 0 };
@@ -112,8 +116,8 @@ export function resolverEntrega(id: unknown, subtotal: number): { erro?: string;
 }
 
 // Aceita o id novo ou o texto antigo ("Pix à Vista (5% OFF)", "Cartão de Crédito em 10x").
-export function resolverPagamento(body: Record<string, unknown>): { erro?: string; metodo?: Pagamento; parcelas: number; descricao: string } {
-  const ativos = db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY display_order, name').all() as unknown as Pagamento[];
+export function resolverPagamento(body: Record<string, unknown>, siteId: string): { erro?: string; metodo?: Pagamento; parcelas: number; descricao: string } {
+  const ativos = db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 AND site_id = ? ORDER BY display_order, name').all(siteId) as unknown as Pagamento[];
   const texto = String(body.paymentMethod || '').trim();
   let m: Pagamento | undefined;
   if (body.paymentMethodId) m = ativos.find((x) => x.id === String(body.paymentMethodId));
@@ -140,19 +144,20 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
   // Opções para o checkout (públicas)
   app.get('/api/checkout/options', (req: Request, res: Response) => {
     const subtotal = Number(req.query.subtotal) || 0;
-    const shipping = entregasAtivas().map((m) => ({
+    const loja = siteVisitante(req);
+    const shipping = entregasAtivas(loja).map((m) => ({
       id: m.id, name: m.name, description: m.description, prazo: prazoTexto(m),
       basePrice: m.price, price: freteEfetivo(m, subtotal), free: freteEfetivo(m, subtotal) === 0, freeAbove: m.free_above,
     }));
-    const payments = (db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY display_order, name').all() as unknown as Pagamento[]).map((p) => ({
+    const payments = (db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 AND site_id = ? ORDER BY display_order, name').all(loja) as unknown as Pagamento[]).map((p) => ({
       id: p.id, name: p.name, description: p.description, kind: p.kind, discountPercent: p.discount_percent, maxInstallments: p.max_installments,
     }));
     res.json({ shipping, payments });
   });
 
   // ---------- Frete ----------
-  app.get('/api/admin/shipping', painel('entrega'), (_req: Request, res: Response) => {
-    res.json(db.prepare('SELECT * FROM shipping_methods ORDER BY display_order, name').all());
+  app.get('/api/admin/shipping', painel('entrega'), (req: Request, res: Response) => {
+    res.json(db.prepare('SELECT * FROM shipping_methods WHERE site_id = ? ORDER BY display_order, name').all(siteAdmin(req)));
   });
 
   function lerEntrega(b: Record<string, unknown>, parcial: boolean): { erro?: string; dados?: Record<string, string | number | null> } {
@@ -178,10 +183,10 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     if ((dados.days_max as number) < (dados.days_min as number)) { res.status(400).json({ error: 'O prazo máximo não pode ser menor que o mínimo.' }); return; }
     let id = slug(String(dados.name)) || 'frete';
     while (db.prepare('SELECT 1 FROM shipping_methods WHERE id = ?').get(id)) id = `${id.slice(0, 34)}-${Math.floor(Math.random() * 900 + 100)}`;
-    const ordem = dados.display_order ?? ((db.prepare('SELECT COALESCE(MAX(display_order),0)+1 AS n FROM shipping_methods').get() as { n: number }).n);
-    db.prepare('INSERT INTO shipping_methods (id, name, description, price, days_min, days_max, free_above, is_active, display_order) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run(id, dados.name, dados.description ?? '', dados.price, dados.days_min, dados.days_max, dados.free_above ?? null, dados.is_active ?? 1, ordem);
-    sincronizarLimite();
+    const ordem = dados.display_order ?? ((db.prepare('SELECT COALESCE(MAX(display_order),0)+1 AS n FROM shipping_methods WHERE site_id = ?').get(siteAdmin(req)) as { n: number }).n);
+    db.prepare('INSERT INTO shipping_methods (id, name, description, price, days_min, days_max, free_above, is_active, display_order, site_id) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .run(id, dados.name, dados.description ?? '', dados.price, dados.days_min, dados.days_max, dados.free_above ?? null, dados.is_active ?? 1, ordem, siteAdmin(req));
+    sincronizarLimite(siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'SHIPPING_CREATED', entity: 'SHIPPING', entityId: id, details: dados });
     res.status(201).json({ success: true, id, message: 'Forma de entrega criada.' });
@@ -189,7 +194,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
 
   app.put('/api/admin/shipping/:id', painel('entrega'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const atual = db.prepare('SELECT * FROM shipping_methods WHERE id = ?').get(id) as unknown as Entrega | undefined;
+    const atual = db.prepare('SELECT * FROM shipping_methods WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as unknown as Entrega | undefined;
     if (!atual) { res.status(404).json({ error: 'Forma de entrega não encontrada.' }); return; }
     const { erro, dados } = lerEntrega(req.body || {}, true);
     if (erro || !dados) { res.status(400).json({ error: erro }); return; }
@@ -198,8 +203,8 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     const campos = Object.keys(dados);
     if (campos.length === 0) { res.status(400).json({ error: 'Nada para atualizar.' }); return; }
     // nomes de coluna vêm de lista fixa montada acima
-    db.prepare(`UPDATE shipping_methods SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number | null>), id);
-    sincronizarLimite();
+    db.prepare(`UPDATE shipping_methods SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND site_id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number | null>), id, siteAdmin(req));
+    sincronizarLimite(siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'SHIPPING_UPDATED', entity: 'SHIPPING', entityId: id, details: dados });
     res.json({ success: true, message: 'Forma de entrega atualizada.' });
@@ -207,18 +212,18 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
 
   app.delete('/api/admin/shipping/:id', painel('entrega'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const m = db.prepare('SELECT name FROM shipping_methods WHERE id = ?').get(id) as { name: string } | undefined;
+    const m = db.prepare('SELECT name FROM shipping_methods WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as { name: string } | undefined;
     if (!m) { res.status(404).json({ error: 'Forma de entrega não encontrada.' }); return; }
-    db.prepare('DELETE FROM shipping_methods WHERE id = ?').run(id);
-    sincronizarLimite();
+    db.prepare('DELETE FROM shipping_methods WHERE id = ? AND site_id = ?').run(id, siteAdmin(req));
+    sincronizarLimite(siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'SHIPPING_DELETED', entity: 'SHIPPING', entityId: id, details: { name: m.name } });
     res.json({ success: true, message: 'Forma de entrega removida. Pedidos antigos continuam com o frete que pagaram.' });
   });
 
   // ---------- Pagamento (somente o proprietário) ----------
-  app.get('/api/admin/payment-methods', painel('pagamento'), (_req: Request, res: Response) => {
-    res.json(db.prepare('SELECT * FROM payment_methods ORDER BY display_order, name').all());
+  app.get('/api/admin/payment-methods', painel('pagamento'), (req: Request, res: Response) => {
+    res.json(db.prepare('SELECT * FROM payment_methods WHERE site_id = ? ORDER BY display_order, name').all(siteAdmin(req)));
   });
 
   function lerPagamento(b: Record<string, unknown>, parcial: boolean): { erro?: string; dados?: Record<string, string | number> } {
@@ -240,9 +245,9 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
     if (dados.kind !== 'card' && (dados.max_installments ?? 1) !== 1) dados.max_installments = 1;
     let id = slug(String(dados.name)) || 'pagamento';
     while (db.prepare('SELECT 1 FROM payment_methods WHERE id = ?').get(id)) id = `${id.slice(0, 34)}-${Math.floor(Math.random() * 900 + 100)}`;
-    const ordem = dados.display_order ?? ((db.prepare('SELECT COALESCE(MAX(display_order),0)+1 AS n FROM payment_methods').get() as { n: number }).n);
-    db.prepare('INSERT INTO payment_methods (id, name, description, kind, discount_percent, max_installments, is_active, display_order) VALUES (?,?,?,?,?,?,?,?)')
-      .run(id, dados.name, dados.description ?? '', dados.kind, dados.discount_percent ?? 0, dados.max_installments ?? 1, dados.is_active ?? 1, ordem);
+    const ordem = dados.display_order ?? ((db.prepare('SELECT COALESCE(MAX(display_order),0)+1 AS n FROM payment_methods WHERE site_id = ?').get(siteAdmin(req)) as { n: number }).n);
+    db.prepare('INSERT INTO payment_methods (id, name, description, kind, discount_percent, max_installments, is_active, display_order, site_id) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(id, dados.name, dados.description ?? '', dados.kind, dados.discount_percent ?? 0, dados.max_installments ?? 1, dados.is_active ?? 1, ordem, siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'PAYMENT_METHOD_CREATED', entity: 'PAYMENT', entityId: id, details: dados });
     res.status(201).json({ success: true, id, message: 'Forma de pagamento criada.' });
@@ -250,14 +255,14 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
 
   app.put('/api/admin/payment-methods/:id', painel('pagamento'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const atual = db.prepare('SELECT * FROM payment_methods WHERE id = ?').get(id) as unknown as Pagamento | undefined;
+    const atual = db.prepare('SELECT * FROM payment_methods WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as unknown as Pagamento | undefined;
     if (!atual) { res.status(404).json({ error: 'Forma de pagamento não encontrada.' }); return; }
     const { erro, dados } = lerPagamento(req.body || {}, true);
     if (erro || !dados) { res.status(400).json({ error: erro }); return; }
     if ((dados.kind ?? atual.kind) !== 'card') dados.max_installments = 1;
     const campos = Object.keys(dados);
     if (campos.length === 0) { res.status(400).json({ error: 'Nada para atualizar.' }); return; }
-    db.prepare(`UPDATE payment_methods SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number>), id);
+    db.prepare(`UPDATE payment_methods SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND site_id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number>), id, siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'PAYMENT_METHOD_UPDATED', entity: 'PAYMENT', entityId: id, details: dados });
     res.json({ success: true, message: 'Forma de pagamento atualizada.' });
@@ -265,9 +270,9 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
 
   app.delete('/api/admin/payment-methods/:id', painel('pagamento'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const m = db.prepare('SELECT name FROM payment_methods WHERE id = ?').get(id) as { name: string } | undefined;
+    const m = db.prepare('SELECT name FROM payment_methods WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as { name: string } | undefined;
     if (!m) { res.status(404).json({ error: 'Forma de pagamento não encontrada.' }); return; }
-    db.prepare('DELETE FROM payment_methods WHERE id = ?').run(id);
+    db.prepare('DELETE FROM payment_methods WHERE id = ? AND site_id = ?').run(id, siteAdmin(req));
     const u = quem(req);
     logAudit({ userId: u.id, userEmail: u.email, action: 'PAYMENT_METHOD_DELETED', entity: 'PAYMENT', entityId: id, details: { name: m.name } });
     res.json({ success: true, message: 'Forma de pagamento removida.' });
@@ -276,7 +281,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
   // ---------- Variações com estoque próprio ----------
   app.get('/api/admin/products/:id/variants', painel('produtos'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const p = db.prepare('SELECT id, stock, variants_json FROM products WHERE id = ?').get(id) as { id: string; stock: number; variants_json: string } | undefined;
+    const p = db.prepare('SELECT id, stock, variants_json FROM products WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as { id: string; stock: number; variants_json: string } | undefined;
     if (!p) { res.status(404).json({ error: 'Produto não encontrado.' }); return; }
     const linhas = variantesDe(id);
     let titulos: string[] = [];
@@ -286,7 +291,7 @@ export function registerAdminCommerce(app: Express, painel: (a: Area) => Request
 
   app.put('/api/admin/products/:id/variants', painel('produtos'), (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const p = db.prepare('SELECT id, name, stock FROM products WHERE id = ?').get(id) as { id: string; name: string; stock: number } | undefined;
+    const p = db.prepare('SELECT id, name, stock FROM products WHERE id = ? AND site_id = ?').get(id, siteAdmin(req)) as { id: string; name: string; stock: number } | undefined;
     if (!p) { res.status(404).json({ error: 'Produto não encontrado.' }); return; }
     const lista = req.body?.variantes;
     if (!Array.isArray(lista) || lista.length > 30) { res.status(400).json({ error: 'Envie a lista de variações (no máximo 30).' }); return; }

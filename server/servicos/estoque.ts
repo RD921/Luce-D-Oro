@@ -13,30 +13,31 @@ const inteiro = (v: unknown): number | null => {
   return Number.isInteger(n) ? n : null;
 };
 
-export function obterEstoque() {
+export function obterEstoque(siteId: string) {
   const products = db
-    .prepare('SELECT id, name, category_id, stock, price, cost_price, image_primary FROM products WHERE is_archived = 0 ORDER BY stock ASC')
-    .all()
+    .prepare('SELECT id, name, category_id, stock, price, cost_price, image_primary FROM products WHERE is_archived = 0 AND site_id = ? ORDER BY stock ASC')
+    .all(siteId)
     .map((p: any) => ({ ...p, variants: variantesDe(p.id) }));
   const movements = db.prepare(`
     SELECT sm.*, p.name as product_name, u.name as user_name
     FROM stock_movements sm
     JOIN products p ON sm.product_id = p.id
     LEFT JOIN users u ON sm.user_id = u.id
+    WHERE p.site_id = ?
     ORDER BY sm.created_at DESC
     LIMIT 30
-  `).all();
+  `).all(siteId);
   return { products, movements };
 }
 
 // Soma ou subtrai do estoque (produto sem variações). Nunca deixa o estoque abaixo de zero.
-export function ajustarEstoque(quem: Quem, d: Record<string, any>): { ok: true; newStock: number; mensagem: string } | Falha {
+export function ajustarEstoque(siteId: string, quem: Quem, d: Record<string, any>): { ok: true; newStock: number; mensagem: string } | Falha {
   if (!d.productId || d.quantityChange === undefined || !d.reason) return falha(400, 'Produto, variação de quantidade e justificativa são obrigatórios.');
   const change = inteiro(d.quantityChange);
   if (change === null || change === 0 || Math.abs(change) > MAX) return falha(400, `Informe uma variação inteira, diferente de zero, de até ${MAX} unidades.`);
   if (typeof d.reason !== 'string' || d.reason.trim().length < 1 || d.reason.length > 300) return falha(400, 'Justificativa inválida (até 300 caracteres, não vazia).');
 
-  const product = db.prepare('SELECT id, name, stock FROM products WHERE id = ?').get(String(d.productId)) as { id: string; name: string; stock: number } | undefined;
+  const product = db.prepare('SELECT id, name, stock FROM products WHERE id = ? AND site_id = ?').get(String(d.productId), siteId) as { id: string; name: string; stock: number } | undefined;
   if (!product) return falha(404, 'Produto não encontrado.');
   if (temVariantes(product.id)) return falha(409, 'Este produto tem variações com estoque próprio. Altere o estoque de cada variação.');
 
@@ -53,10 +54,10 @@ export function ajustarEstoque(quem: Quem, d: Record<string, any>): { ok: true; 
 }
 
 // Define a quantidade exata (contagem). Em produto com variações, informe qual variação.
-export function definirEstoque(quem: Quem, d: Record<string, any>): { ok: true; newStock: number; mensagem: string } | Falha {
+export function definirEstoque(siteId: string, quem: Quem, d: Record<string, any>): { ok: true; newStock: number; mensagem: string } | Falha {
   const q = inteiro(d.quantity);
   if (!d.productId || q === null || q < 0 || q > MAX) return falha(400, `Informe uma quantidade inteira entre 0 e ${MAX}.`);
-  const p = db.prepare('SELECT id, name, stock FROM products WHERE id = ?').get(String(d.productId)) as { id: string; name: string; stock: number } | undefined;
+  const p = db.prepare('SELECT id, name, stock FROM products WHERE id = ? AND site_id = ?').get(String(d.productId), siteId) as { id: string; name: string; stock: number } | undefined;
   if (!p) return falha(404, 'Produto não encontrado.');
   const motivo = String(d.reason || '').trim().slice(0, 300) || 'Contagem de estoque';
   const variante = d.variant !== undefined ? String(d.variant) : '';

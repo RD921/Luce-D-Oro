@@ -7,6 +7,7 @@ import os from 'node:os';
 import { db } from './db.js';
 import { PAPEIS, type Area } from './adminTeam.js';
 import { UPLOAD_DIR } from './adminExtras.js';
+import { siteAdmin } from './sites.js';
 
 type Estado = 'ok' | 'falha' | 'nao_verificado' | 'atencao';
 interface Verificacao { id: string; titulo: string; estado: Estado; detalhe: string }
@@ -36,7 +37,8 @@ function podeEscrever(dir: string): boolean {
 }
 
 export function registerAdminArchitecture(app: Express, painel: (a: Area) => RequestHandler) {
-  app.get('/api/admin/architecture/overview', painel('arquitetura') as RequestHandler, (_req: Request, res: Response) => {
+  app.get('/api/admin/architecture/overview', painel('arquitetura') as RequestHandler, (req: Request, res: Response) => {
+    const loja = siteAdmin(req);
     const config: Record<string, string> = {};
     try {
       for (const r of db.prepare('SELECT key, value FROM system_settings').all() as Array<{ key: string; value: string }>) config[r.key] = r.value;
@@ -98,13 +100,13 @@ export function registerAdminArchitecture(app: Express, painel: (a: Area) => Req
       },
       ultimaAtividade: ((): string | null => { try { return (db.prepare('SELECT created_at FROM admin_audit_logs ORDER BY id DESC LIMIT 1').get() as { created_at: string } | undefined)?.created_at ?? null; } catch { return null; } })(),
       contagens: {
-        produtos: n('SELECT COUNT(*) AS n FROM products'),
-        categorias: n('SELECT COUNT(*) AS n FROM categories'),
-        pedidos: n('SELECT COUNT(*) AS n FROM orders'),
-        clientes: n("SELECT COUNT(*) AS n FROM users WHERE role = 'customer'"),
-        equipe: n("SELECT COUNT(*) AS n FROM users WHERE role <> 'customer'"),
-        banners: n('SELECT COUNT(*) AS n FROM banners'),
-        cupons: n('SELECT COUNT(*) AS n FROM coupons'),
+        produtos: n('SELECT COUNT(*) AS n FROM products WHERE site_id = ?', loja),
+        categorias: n('SELECT COUNT(*) AS n FROM categories WHERE site_id = ?', loja),
+        pedidos: n('SELECT COUNT(*) AS n FROM orders WHERE site_id = ?', loja),
+        clientes: n("SELECT COUNT(*) AS n FROM users WHERE role = 'customer' AND site_id = ?", loja),
+        equipe: n("SELECT COUNT(*) AS n FROM users WHERE role <> 'customer' AND site_id = ?", loja),
+        banners: n('SELECT COUNT(*) AS n FROM banners WHERE site_id = ?', loja),
+        cupons: n('SELECT COUNT(*) AS n FROM coupons WHERE site_id = ?', loja),
       },
       usuariosPorPapel,
       armazenamento: { arquivos: uploads.arquivos, bytes: uploads.bytes, bancoBytes: dbBytes, backups: backups.length },

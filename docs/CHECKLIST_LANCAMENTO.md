@@ -35,11 +35,11 @@ Estado conferido por testes automáticos (`test_*.mjs`) e por revisão. Itens ma
 
 ## Como rodar os testes
 Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
-`test_seguranca`, `test_fase7`, `test_versoes`, `test_midia`, `test_arquitetura`, `test_fase3`, `test_fase3b`, `test_fase4`, `test_admin_extras`.
+`test_seguranca`, `test_fase7`, `test_versoes`, `test_midia`, `test_arquitetura`, `test_fase3`, `test_fase3b`, `test_fase4`, `test_admin_extras`, `test_isolamento`.
 
 ## Vários sites (Fase 2)
 - Cada site tem conteúdo, imagens, SEO, rascunhos e versões próprios; o site público é escolhido pelo domínio (Host).
-- Produtos, pedidos, clientes e banners continuam compartilhados com a loja principal.
+- Cada loja tem produtos, categorias, banners, cupons, frete, pagamento e pedidos próprios (veja Fase 3).
 - Para um cliente novo: Arquitetura → Sites e clientes → Adicionar site, e aponte o domínio dele para este servidor.
 
 ## Banco e backups
@@ -56,5 +56,7 @@ Cada suíte deve rodar em um banco limpo (reinicie o servidor entre elas):
 ## Lojas independentes (Fase 3)
 - Etapa 1 pronta: as tabelas comerciais (categorias, produtos, banners, cupons, frete, pagamento, pedidos, auditoria, notificações e usuários) têm `site_id`. Tudo o que existia ficou na loja principal; o proprietário fica sem loja (vê todas).
 - A migração roda sozinha na subida, só se faltar coluna, e antes cria `data/backup-pre-lojas-AAAAMMDD-HHMMSS.db`. Esse backup nunca é apagado sozinho. Para voltar atrás: pare o servidor e restaure esse arquivo como `luce_d_oro.db`.
-- Ainda NÃO há isolamento: o painel e a vitrine continuam enxergando tudo. As etapas 2 a 5 (painel por loja, vitrine por domínio, contas por loja, loja nova vazia) vêm a seguir.
-- Teste: `DATA_DIR=<cópia de um banco antigo> npx tsx test_lojas.ts`.
+- Etapas 2 e 3 prontas: painel (X-Site-Id) e vitrine (Host) só enxergam e só alteram dados da própria loja: produtos, estoque, variações, categorias, banners, cupons, frete, pagamento, pedidos, sacola, checkout, mídia e dashboard. Códigos de cupom e endereços de categoria podem se repetir entre lojas.
+- Categorias de lojas novas têm id `<endereço>~<loja>` (o id é único no banco); na loja principal continua igual ao endereço.
+- Ainda falta: contas de clientes e equipe separadas por loja (etapa 4) e loja nova nascer pronta/vazia com seletor limitado (etapa 5). Por enquanto a lista de clientes usa `users.site_id` e a auditoria ainda é global.
+- Testes: `test_isolamento.mjs` (servidor limpo) e `DATA_DIR=<cópia de um banco antigo> npx tsx test_lojas.ts`.

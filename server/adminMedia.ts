@@ -131,13 +131,13 @@ function colecoesDeTexto(siteId: string): Array<{ onde: string; texto: string }>
   const itens: Array<{ onde: string; texto: string }> = [];
   const add = (onde: string, ...partes: Array<unknown>) => itens.push({ onde, texto: partes.map((p) => String(p ?? '')).join(' ') });
   const seguro = <T>(sql: string, ...args: string[]): T[] => { try { return db.prepare(sql).all(...args) as T[]; } catch { return []; } };
-  // Conteúdo e SEO são de cada site; banners, categorias, produtos e configurações da loja são da loja principal.
+  // Conteúdo, SEO, banners, categorias e produtos são de cada loja; só os ajustes antigos do sistema são da principal.
   for (const c of seguro<Record<string, unknown>>('SELECT key, value FROM site_content WHERE site_id = ?', siteId)) add(`Conteúdo do site (${c.key})`, c.value);
   for (const c of seguro<Record<string, unknown>>('SELECT key, value FROM site_settings WHERE site_id = ?', siteId)) add(`SEO (${c.key})`, c.value);
+  for (const b of seguro<Record<string, unknown>>('SELECT * FROM banners WHERE site_id = ?', siteId)) add(`Banner "${b.title ?? b.id}"`, b.image_desktop, b.image_mobile);
+  for (const c of seguro<Record<string, unknown>>('SELECT id, name, image_url FROM categories WHERE site_id = ?', siteId)) add(`Categoria ${c.name}`, c.image_url);
+  for (const p of seguro<Record<string, unknown>>('SELECT id, name, image_primary, images_json FROM products WHERE site_id = ?', siteId)) add(`Produto ${p.name}`, p.image_primary, p.images_json);
   if (siteId === SITE_PRINCIPAL) {
-    for (const b of seguro<Record<string, unknown>>('SELECT * FROM banners')) add(`Banner "${b.title ?? b.id}"`, b.image_desktop, b.image_mobile);
-    for (const c of seguro<Record<string, unknown>>('SELECT id, name, image_url FROM categories')) add(`Categoria ${c.name}`, c.image_url);
-    for (const p of seguro<Record<string, unknown>>('SELECT id, name, image_primary, images_json FROM products')) add(`Produto ${p.name}`, p.image_primary, p.images_json);
     for (const s of seguro<Record<string, unknown>>("SELECT key, value FROM system_settings WHERE key NOT LIKE 'seo_%'")) add(`Configuração ${s.key}`, s.value);
   }
   return itens;

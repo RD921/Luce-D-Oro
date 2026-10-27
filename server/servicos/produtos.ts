@@ -16,18 +16,18 @@ const inteiro = (v: unknown) => { const n = numero(v); return Number.isInteger(n
 const listaTextos = (v: unknown, max: number): string[] | null =>
   Array.isArray(v) && v.length <= max && v.every((x) => typeof x === 'string' && x.trim() !== '' && x.length <= 300) ? v.map((x: string) => x.trim()) : null;
 
-export function listarProdutosAdmin() {
-  const rows = db.prepare('SELECT * FROM products ORDER BY created_at DESC').all() as any[];
+export function listarProdutosAdmin(siteId: string) {
+  const rows = db.prepare('SELECT * FROM products WHERE site_id = ? ORDER BY created_at DESC').all(siteId) as any[];
   return rows.map((r) => ({ ...r, images: JSON.parse(r.images_json || '[]'), variants: JSON.parse(r.variants_json || '[]'), variant_stock: variantesDe(r.id) }));
 }
 
 const textoCurto = (v: unknown, max: number) => (typeof v === 'string' && v.length <= max ? v : null);
 
-export function criarProduto(quem: Quem, d: Record<string, any>): { ok: true; id: string } | Falha {
+export function criarProduto(siteId: string, quem: Quem, d: Record<string, any>): { ok: true; id: string } | Falha {
   if (!d.name || !d.category_id || d.price === undefined || !d.image_primary) return falha(400, 'Nome, categoria, preço e imagem principal são obrigatórios.');
   if (typeof d.name !== 'string' || d.name.trim().length < 2 || d.name.length > 120) return falha(400, 'Nome inválido (de 2 a 120 caracteres).');
   if (typeof d.image_primary !== 'string' || d.image_primary.length > 500) return falha(400, 'Imagem principal inválida.');
-  if (typeof d.category_id !== 'string' || !db.prepare('SELECT 1 FROM categories WHERE id = ?').get(d.category_id)) return falha(400, 'Categoria inválida.');
+  if (typeof d.category_id !== 'string' || !db.prepare('SELECT 1 FROM categories WHERE id = ? AND site_id = ?').get(d.category_id, siteId)) return falha(400, 'Categoria inválida.');
   const price = dinheiro(d.price);
   if (price === null) return falha(400, 'Preço inválido.');
   let oldPrice: number | null = null;
@@ -47,7 +47,7 @@ export function criarProduto(quem: Quem, d: Record<string, any>): { ok: true; id
   const nome = d.name.trim();
   const baseSlug = nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   let slug = baseSlug;
-  if (db.prepare('SELECT id FROM products WHERE slug = ?').get(slug)) slug = `${baseSlug}-${Date.now().toString(36)}`;
+  if (db.prepare('SELECT id FROM products WHERE slug = ? AND site_id = ?').get(slug, siteId)) slug = `${baseSlug}-${Date.now().toString(36)}`;
   const id = `prod_${baseSlug.replace(/-/g, '_')}_${Date.now().toString(36)}`;
 
   emTransacao(() => {
@@ -55,12 +55,12 @@ export function criarProduto(quem: Quem, d: Record<string, any>): { ok: true; id
       INSERT INTO products (
         id, name, slug, category_id, price, old_price, cost_price, is_archived, description,
         materials, care_instructions, dimensions, warranty, stock, is_featured,
-        image_primary, images_json, variants_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        image_primary, images_json, variants_json, site_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, nome, slug, d.category_id, price, oldPrice, cost, d.description || '', d.materials || '',
       d.care_instructions ?? '', d.dimensions ?? '', d.warranty ?? "1 ano de garantia Luce D'Oro", stock, d.is_featured ? 1 : 0,
-      d.image_primary, JSON.stringify(images.length > 0 ? images : [d.image_primary]), JSON.stringify(variants.length > 0 ? variants : ['Padrão'])
+      d.image_primary, JSON.stringify(images.length > 0 ? images : [d.image_primary]), JSON.stringify(variants.length > 0 ? variants : ['Padrão']), siteId
     );
     db.prepare(`
       INSERT INTO stock_movements (product_id, quantity_change, previous_stock, new_stock, reason, user_id)
@@ -71,12 +71,12 @@ export function criarProduto(quem: Quem, d: Record<string, any>): { ok: true; id
   return { ok: true, id };
 }
 
-export function atualizarProduto(quem: Quem, id: string, d: Record<string, any>): { ok: true } | Falha {
-  const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as any;
+export function atualizarProduto(siteId: string, quem: Quem, id: string, d: Record<string, any>): { ok: true } | Falha {
+  const existing = db.prepare('SELECT * FROM products WHERE id = ? AND site_id = ?').get(id, siteId) as any;
   if (!existing) return falha(404, 'Produto não encontrado.');
 
   if (d.name !== undefined && (typeof d.name !== 'string' || (d.name.trim() !== '' && (d.name.trim().length < 2 || d.name.length > 120)))) return falha(400, 'Nome inválido (de 2 a 120 caracteres).');
-  if (d.category_id && (typeof d.category_id !== 'string' || !db.prepare('SELECT 1 FROM categories WHERE id = ?').get(d.category_id))) return falha(400, 'Categoria inválida.');
+  if (d.category_id && (typeof d.category_id !== 'string' || !db.prepare('SELECT 1 FROM categories WHERE id = ? AND site_id = ?').get(d.category_id, siteId))) return falha(400, 'Categoria inválida.');
   if (d.image_primary !== undefined && d.image_primary !== '' && (typeof d.image_primary !== 'string' || d.image_primary.length > 500)) return falha(400, 'Imagem principal inválida.');
   const price = d.price !== undefined ? dinheiro(d.price) : undefined;
   if (price === null) return falha(400, 'Preço inválido.');
@@ -126,8 +126,8 @@ export function atualizarProduto(quem: Quem, id: string, d: Record<string, any>)
 }
 
 // Arquiva em vez de apagar, para não quebrar o histórico de pedidos.
-export function arquivarProduto(quem: Quem, id: string): { ok: true; nome: string } | Falha {
-  const existing = db.prepare('SELECT id, name FROM products WHERE id = ?').get(id) as { id: string; name: string } | undefined;
+export function arquivarProduto(siteId: string, quem: Quem, id: string): { ok: true; nome: string } | Falha {
+  const existing = db.prepare('SELECT id, name FROM products WHERE id = ? AND site_id = ?').get(id, siteId) as { id: string; name: string } | undefined;
   if (!existing) return falha(404, 'Produto não encontrado.');
   db.prepare('UPDATE products SET is_archived = 1 WHERE id = ?').run(id);
   logAudit({ userId: quem.id, userEmail: quem.email, action: 'PRODUCT_ARCHIVED', entity: 'PRODUCTS', entityId: id, details: { name: existing.name } });

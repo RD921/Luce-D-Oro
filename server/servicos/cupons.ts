@@ -96,10 +96,10 @@ export function calcularDesconto(c: Pick<CupomRow, 'discount_type' | 'discount_v
 }
 
 // Cupom informado pelo cliente no carrinho (rota pública). userId é null para visitante sem login.
-export function validarCupomPublico(codigo: unknown, cartTotal: unknown, userId: number | null):
+export function validarCupomPublico(siteId: string, codigo: unknown, cartTotal: unknown, userId: number | null):
   | { ok: true; code: string; discountType: string; discountValue: number; discountAmount: number } | Falha {
   if (!codigo) return falha(400, 'Código de cupom obrigatório.');
-  const c = db.prepare('SELECT * FROM coupons WHERE code = ?').get(String(codigo).trim().toUpperCase()) as CupomRow | undefined;
+  const c = db.prepare('SELECT * FROM coupons WHERE code = ? AND site_id = ?').get(String(codigo).trim().toUpperCase(), siteId) as CupomRow | undefined;
   if (!c) return falha(404, 'Cupom inválido ou inativo.');
   const total = Number(cartTotal);
   const subtotal = Number.isFinite(total) && total > 0 ? total : 0;
@@ -108,27 +108,27 @@ export function validarCupomPublico(codigo: unknown, cartTotal: unknown, userId:
   return { ok: true, code: c.code, discountType: c.discount_type, discountValue: c.discount_value, discountAmount: calcularDesconto(c, subtotal) };
 }
 
-export function listarCupons() {
-  return db.prepare('SELECT * FROM coupons ORDER BY created_at DESC').all();
+export function listarCupons(siteId: string) {
+  return db.prepare('SELECT * FROM coupons WHERE site_id = ? ORDER BY created_at DESC').all(siteId);
 }
 
-export function criarCupom(quem: Quem, body: Record<string, any>): { ok: true; id: string } | Falha {
+export function criarCupom(siteId: string, quem: Quem, body: Record<string, any>): { ok: true; id: string } | Falha {
   const code = String(body?.code || '').trim().toUpperCase();
   if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return falha(400, 'O código deve ter de 3 a 30 letras, números, "-" ou "_".');
   const { erro, dados } = lerCupom(body || {}, false);
   if (erro || !dados) return falha(400, erro || 'Dados do cupom inválidos.');
-  if (db.prepare('SELECT id FROM coupons WHERE code = ?').get(code)) return falha(409, 'Já existe um cupom cadastrado com este código.');
-  const id = `cp_${code.toLowerCase()}_${Date.now().toString(36)}`;
+  if (db.prepare('SELECT id FROM coupons WHERE code = ? AND site_id = ?').get(code, siteId)) return falha(409, 'Já existe um cupom cadastrado com este código.');
+  const id = `cp_${siteId === 'luce-d-oro' ? '' : siteId + '_'}${code.toLowerCase()}_${Date.now().toString(36)}`;
   db.prepare(
-    `INSERT INTO coupons (id, code, discount_type, discount_value, min_spend, is_active, usage_count, expires_at, usage_limit, per_customer_limit)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
-  ).run(id, code, dados.discount_type, dados.discount_value, dados.min_spend ?? 0, dados.is_active ?? 1, dados.expires_at ?? null, dados.usage_limit ?? null, dados.per_customer_limit ?? null);
+    `INSERT INTO coupons (id, code, discount_type, discount_value, min_spend, is_active, usage_count, expires_at, usage_limit, per_customer_limit, site_id)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
+  ).run(id, code, dados.discount_type, dados.discount_value, dados.min_spend ?? 0, dados.is_active ?? 1, dados.expires_at ?? null, dados.usage_limit ?? null, dados.per_customer_limit ?? null, siteId);
   logAudit({ userId: quem.id, userEmail: quem.email, action: 'COUPON_CREATED', entity: 'COUPONS', entityId: id, details: { code, ...dados } });
   return { ok: true, id };
 }
 
-export function atualizarCupom(quem: Quem, id: string, body: Record<string, any>): { ok: true } | Falha {
-  const atual = db.prepare('SELECT * FROM coupons WHERE id = ?').get(id) as CupomRow | undefined;
+export function atualizarCupom(siteId: string, quem: Quem, id: string, body: Record<string, any>): { ok: true } | Falha {
+  const atual = db.prepare('SELECT * FROM coupons WHERE id = ? AND site_id = ?').get(id, siteId) as CupomRow | undefined;
   if (!atual) return falha(404, 'Cupom não encontrado.');
   const { erro, dados } = lerCupom(body || {}, true);
   if (erro || !dados) return falha(400, erro || 'Dados do cupom inválidos.');
@@ -139,15 +139,15 @@ export function atualizarCupom(quem: Quem, id: string, body: Record<string, any>
   const campos = Object.keys(dados);
   if (campos.length === 0) return falha(400, 'Nada para atualizar.');
   // nomes de coluna vêm da lista fixa de lerCupom, nunca do usuário
-  db.prepare(`UPDATE coupons SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number | null>), id);
+  db.prepare(`UPDATE coupons SET ${campos.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND site_id = ?`).run(...(campos.map((c) => dados[c]) as Array<string | number | null>), id, siteId);
   logAudit({ userId: quem.id, userEmail: quem.email, action: 'COUPON_UPDATED', entity: 'COUPONS', entityId: id, details: dados });
   return { ok: true };
 }
 
-export function removerCupom(quem: Quem, id: string): { ok: true } | Falha {
-  const atual = db.prepare('SELECT code FROM coupons WHERE id = ?').get(id) as { code: string } | undefined;
+export function removerCupom(siteId: string, quem: Quem, id: string): { ok: true } | Falha {
+  const atual = db.prepare('SELECT code FROM coupons WHERE id = ? AND site_id = ?').get(id, siteId) as { code: string } | undefined;
   if (!atual) return falha(404, 'Cupom não encontrado.');
-  db.prepare('DELETE FROM coupons WHERE id = ?').run(id);
+  db.prepare('DELETE FROM coupons WHERE id = ? AND site_id = ?').run(id, siteId);
   logAudit({ userId: quem.id, userEmail: quem.email, action: 'COUPON_DELETED', entity: 'COUPONS', entityId: id, details: { code: atual.code } });
   return { ok: true };
 }
