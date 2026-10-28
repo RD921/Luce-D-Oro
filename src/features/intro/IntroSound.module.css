@@ -1,6 +1,6 @@
 /* ==========================================================================
-   LUCE D’ORO — ABERTURA CINEMATOGRÁFICA EM TELA CHEIA
-   Fundo preto absoluto, imagem completa sem faixas ou cortes, transição fluida
+   LUCE D’ORO — ABERTURA CINEMATOGRÁFICA EM ALTA DEFINIÇÃO
+   Fundo preto absoluto, imagem 2.5K nítida, sem faixas ou cortes
    ========================================================================== */
 
 .splash {
@@ -44,17 +44,22 @@
   display: block;
   user-select: none;
   -webkit-user-drag: none;
-  animation: cinematicFadeIn 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  filter: contrast(1.04) brightness(1.02);
+  animation: cinematicFadeIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes cinematicFadeIn {
   0% {
     opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.985) translateZ(0);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateZ(0);
   }
 }
 
