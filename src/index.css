@@ -4,12 +4,21 @@
    ========================================================================== */
 
 :root {
-  /* Color Palette */
-  --bg-primary: #F4EFE7;       /* Warm ivory / marfim suave */
-  --bg-secondary: #F3EFE8;     /* Very light warm beige */
+  /* Color Palette — Luxury Black & Rose Gold Apple-Style Foundation */
+  --bg-dark-deep: #050304;     /* Preto profundo abertura */
+  --bg-dark-surface: #100B0E;  /* Preto de superfície editorial */
+  --bg-dark-wine: #29131D;     /* Vinho escuro sofisticado */
+  
+  --rose-primary: #E9A3BB;     /* Rosa principal da marca */
+  --rose-light: #F6D5E0;       /* Rosa-claro perolado */
+  --rose-metallic: #D98CA8;    /* Rosa metálico */
+  --text-muted-rose: #BEB2B7;  /* Texto secundário rosa acinzentado */
+
+  --bg-primary: #FAF6F4;       /* Warm ivory / Marfim editorial */
+  --bg-secondary: #F3ECE8;     /* Very light warm beige */
   --bg-surface: #FFFFFF;       /* Pure clean card surface */
   --bg-elevated: #FAF7F2;      /* Elevated subtle tint */
-  --bg-overlay: rgba(26, 26, 26, 0.45);
+  --bg-overlay: rgba(5, 3, 4, 0.65);
 
   --text-primary: #1A1A1A;     /* Soft graphite black */
   --text-secondary: #6B6864;   /* Discreet warm gray */
@@ -24,14 +33,15 @@
   --border-subtle: #EBE5DC;    /* Delicate warm border */
   --border-focus: #1A1A1A;     /* Sharp focus line */
   --border-gold: rgba(184, 151, 88, 0.35);
+  --border-rose: rgba(233, 163, 187, 0.3);
 
   --btn-primary-bg: #1A1A1A;
   --btn-primary-text: #FAF8F5;
   --btn-primary-hover: #2D2D2D;
 
   /* Typography */
-  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
 
   /* Spacing */
   --space-xs: 0.25rem;
